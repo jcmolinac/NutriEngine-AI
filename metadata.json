@@ -1,0 +1,1 @@
+{"name":"NutriEngine AI","description":"Motor integral de IA para escaneo de platos, conteo calórico, registro por voz, metas antropométricas, planificación de comidas y coaching nutricional con salida JSON.","requestFramePermissions":["camera","microphone"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
