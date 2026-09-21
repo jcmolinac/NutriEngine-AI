@@ -8,19 +8,17 @@ import {
   CalendarDays,
   ShoppingCart,
   Sparkles,
-  Code2,
   Activity,
   User as UserIcon,
   LogOut,
 } from "lucide-react";
 import { AccionEjecutada } from "@/types/nutrition";
-import { PWAInstallButton } from "./PWAInstallButton";
 
 interface NavbarProps {
   activeTab: AccionEjecutada;
   setActiveTab: (tab: AccionEjecutada) => void;
-  showJsonDrawer: boolean;
-  setShowJsonDrawer: (show: boolean) => void;
+  showJsonDrawer?: boolean;
+  setShowJsonDrawer?: (show: boolean) => void;
   isProcessing: boolean;
   onOpenLiveCamera: () => void;
   currentUser?: { id: string; email: string; nombre?: string } | null;
@@ -113,19 +111,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Top Action Tools (User Auth + Install PWA + JSON Inspector) */}
+          {/* Top Action Tools (User Auth) */}
           <div className="flex items-center gap-1.5">
             {/* User Session Pill or Login Trigger */}
             {currentUser ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   id="btn-user-profile-pill"
                   onClick={onOpenAuthModal}
-                  className="h-9 min-h-[44px] px-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                  className="h-9 min-h-[44px] px-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] max-w-[65px] truncate font-semibold">
+                  <span className="text-xs max-w-[90px] truncate font-semibold">
                     {currentUser.nombre || currentUser.email.split("@")[0]}
                   </span>
                 </button>
@@ -145,31 +143,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id="btn-open-auth-modal"
                 type="button"
                 onClick={onOpenAuthModal}
-                className="h-9 min-h-[44px] px-2.5 rounded-xl bg-fitia-yellow hover:bg-[#F5BF00] text-fitia-dark text-xs font-black flex items-center gap-1.5 transition active:scale-95 shadow-2xs"
+                className="h-9 min-h-[44px] px-3.5 rounded-xl bg-fitia-yellow hover:bg-[#F5BF00] text-fitia-dark text-xs font-black flex items-center gap-1.5 transition active:scale-95 shadow-2xs"
               >
                 <UserIcon className="w-3.5 h-3.5 text-fitia-dark" />
-                <span className="text-[11px]">Entrar</span>
+                <span className="text-xs">Entrar</span>
               </button>
             )}
-
-            <PWAInstallButton />
-
-            {/* JSON Inspector trigger */}
-            <button
-              id="btn-toggle-json-inspector"
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined" && "vibrate" in navigator) {
-                  navigator.vibrate?.(20);
-                }
-                setShowJsonDrawer(!showJsonDrawer);
-              }}
-              aria-label="Abrir Inspector JSON"
-              className="h-9 min-h-[44px] px-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-700 border border-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition"
-            >
-              <Code2 className="w-4 h-4 text-neutral-800" />
-              <span className="text-[11px] font-mono">JSON</span>
-            </button>
           </div>
         </div>
 
