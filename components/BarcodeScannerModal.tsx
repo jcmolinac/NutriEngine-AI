@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ScanBarcode,
   X,
@@ -51,24 +51,39 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [cameraActive, setCameraActive] = useState(false);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Intentar inicializar BarcodeDetector si está disponible en el navegador
-  useEffect(() => {
-    if (!isOpen) {
-      stopCamera();
-      setProduct(null);
-      setError(null);
-      setBarcodeInput("");
-      return;
+  const stopCamera = useCallback(() => {
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
     }
+    setCameraActive(false);
+  }, []);
 
-    startCamera();
+  const handleLookup = useCallback(async (code: string) => {
+    const clean = code.trim();
+    if (!clean) return;
+    setIsLoading(true);
+    setError(null);
 
-    return () => {
+    try {
+      const res = await fetch(`/api/barcode/${encodeURIComponent(clean)}`);
+      if (!res.ok) {
+        throw new Error("Producto no encontrado");
+      }
+      const data: ProductoCodigoBarras = await res.json();
+      setProduct(data);
+      setGrams(data.porcion_g || 100);
       stopCamera();
-    };
-  }, [isOpen]);
+    } catch {
+      setError("No encontramos el producto en la base de datos. Puedes introducir los datos manualmente.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [stopCamera]);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) return;
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -98,7 +113,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                     handleLookup(detected);
                   }
                 }
-              } catch (e) {
+              } catch {
                 // Ignore detection frame errors
               }
             }
@@ -109,39 +124,25 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       console.warn("Cámara no disponible para escáner de código de barras:", err);
       setCameraActive(false);
     }
-  };
+  }, [handleLookup, isLoading, product]);
 
-  const stopCamera = () => {
-    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraActive(false);
-  };
-
-  const handleLookup = async (code: string) => {
-    const clean = code.trim();
-    if (!clean) return;
-    setIsLoading(true);
+  const handleCloseModal = useCallback(() => {
+    stopCamera();
+    setProduct(null);
     setError(null);
+    setBarcodeInput("");
+    onClose();
+  }, [onClose, stopCamera]);
 
-    try {
-      const res = await fetch(`/api/barcode/${encodeURIComponent(clean)}`);
-      if (!res.ok) {
-        throw new Error("Producto no encontrado");
-      }
-      const data: ProductoCodigoBarras = await res.json();
-      setProduct(data);
-      setGrams(data.porcion_g || 100);
-      stopCamera();
-    } catch (err: any) {
-      setError("No encontramos el producto en la base de datos. Puedes introducir los datos manualmente.");
-    } finally {
-      setIsLoading(false);
+  // Intentar inicializar BarcodeDetector si está disponible en el navegador
+  useEffect(() => {
+    if (isOpen) {
+      startCamera();
     }
-  };
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen, startCamera, stopCamera]);
 
   const handleApplyPreset = (code: string) => {
     setBarcodeInput(code);
@@ -167,7 +168,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     }
 
     onAddMeal(itemToAdd, selectedMealTime);
-    onClose();
+    handleCloseModal();
   };
 
   if (!isOpen) return null;
@@ -194,7 +195,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <button
             type="button"
             id="btn-close-barcode-modal"
-            onClick={onClose}
+            onClick={handleCloseModal}
             aria-label="Cerrar"
             className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center"
           >
