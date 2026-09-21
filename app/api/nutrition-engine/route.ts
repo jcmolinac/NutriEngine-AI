@@ -163,16 +163,42 @@ Acción solicitada o detectada: "${targetAction}"
 
     parts.push({ text: instructionText });
 
-    const selectedModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const candidateModels: string[] = [
+      process.env.GEMINI_MODEL,
+      "gemini-flash-latest",
+      "gemini-3.8-flash",
+      "gemini-3.5-flash",
+      "gemini-3.6-flash",
+      "gemini-flash-lite-latest",
+    ].filter((m): m is string => Boolean(m));
 
-    const response = await ai.models.generateContent({
-      model: selectedModel,
-      contents: { parts },
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-      },
-    });
+    let response: any = null;
+    let modelUsed = "gemini-flash-latest";
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents: { parts },
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            responseMimeType: "application/json",
+          },
+        });
+        if (response && response.text) {
+          modelUsed = model;
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[NutriEngine] Modelo ${model} no disponible (${err?.status || err?.message || err}). Probando siguiente...`);
+        lastError = err;
+      }
+    }
+
+    if (!response || !response.text) {
+      throw lastError || new Error("No se pudo obtener respuesta de ningún modelo de IA activo.");
+    }
 
     const responseText = response.text || "{}";
     let parsed: any;
@@ -206,7 +232,7 @@ Acción solicitada o detectada: "${targetAction}"
 
     const normalized = sanitizeAndNormalizeOutput(parsed, targetAction);
     return NextResponse.json(normalized, {
-      headers: { "X-Engine-Source": selectedModel },
+      headers: { "X-Engine-Source": modelUsed },
     });
   } catch (error: any) {
     console.error("Error en API /api/nutrition-engine (aplicando fallback seguro por acción):", error?.message || error);

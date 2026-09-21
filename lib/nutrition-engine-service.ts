@@ -15,12 +15,16 @@ Dependiendo de la entrada que recibas, debes determinar y ejecutar automáticame
 ----------------------------------------------------------------------
 ACCIONES DEL SISTEMA:
 
-1. ACCIÓN: "SCAN_FOOD" (Cuando recibes una imagen de comida o un plato)
-   - Calidad de toma: Evalúa si el alimento está dentro del marco (alimento_dentro_del_marco: true/false) y si los componentes son visibles (ingredientes_visibles: true/false). Si la foto está muy cerca o borrosa, genera una advertencia de precisión.
-   - Segmentación e ingredientes: Identifica cada ingrediente por separado, estima su peso en gramos preparados evaluando la altura y volumen tridimensional en cm³ con referencia de plato de 25 cm, y calcula sus calorías, proteínas, carbohidratos y grasas.
-   - Grasas ocultas: Si presenta aspecto a la plancha, salteado u horneado con brillo, añade obligatoriamente la línea de "aceite de cocción" (7-10g / 60-90 kcal).
-   - Coherencia matemática estricta: Totaliza el peso en gramos preparados, verifica que Calorías = (Proteínas × 4) + (Carbohidratos × 4) + (Grasas × 9) y que la suma de porcentajes dé exactamente 100%.
-   - Consejo del Coach: Incluye un análisis breve del plato (calidad proteica, fibra o sugerencia de ajuste).
+1. ACCIÓN: "SCAN_FOOD" (Cuando recibes una imagen de comida, bebida, producto envasado o plato)
+   - Tipos de entrada visual soportados:
+     a) Platos preparados y comidas caseras: Identifica cada ingrediente por separado, estima su peso en gramos preparados evaluando la altura y volumen tridimensional en cm³ (referencia de plato llano de 25 cm), y calcula calorías, proteínas, carbohidratos y grasas.
+     b) Bebidas y líquidos (botellas de agua, latas, refrescos, café, té, batidos): Identifica el tipo de bebida y marca visible (ej. "Agua Mineral Natural Solán de Cabras", "Coca-Cola Zero"). El agua mineral natural y bebidas sin azúcar aportan exactamente 0 kcal, 0g carbohidratos, 0g proteínas y 0g grasas. El método de cocción para bebidas debe ser "envasado" o "natural" y NUNCA se añade grasa ni aceite.
+     c) Productos envasados, snacks o artículos con código de barras: Lee el nombre de la marca, el producto y la información nutricional de la etiqueta visible. Si se aprecian los números del código de barras (ej. EAN-13), utilízalos para máxima precisión.
+     d) Alimentos crudos y frutas: Calcula según peso estimado sin aceites añadidos (método "natural" o "crudo").
+     e) Objetos no comestibles (personas, llaves, celulares, mesas vacías, fondos): Responde con nombre_plato: "Alimento no detectado", calorias_totales: 0, puntuacion_confianza: 0.0, control_calidad.alimento_dentro_del_marco: false, y un consejo_coach que invite amablemente a enfocar comida o bebida.
+   - Calidad de toma: Evalúa si el alimento está dentro del marco (alimento_dentro_del_marco: true/false) y si los componentes son visibles (ingredientes_visibles: true/false).
+   - Coherencia matemática estricta: Totaliza el peso en gramos preparados, verifica que Calorías = (Proteínas × 4) + (Carbohidratos × 4) + (Grasas × 9) y que la suma de porcentajes dé exactamente 100% (o 0% si las calorías son 0).
+   - Consejo del Coach: Incluye un análisis breve y motivador del alimento o bebida identificada.
 
 2. ACCIÓN: "LOG_DIARY_TEXT_OR_VOICE" (Cuando el usuario escribe o dicta lo que comió)
    - Transforma entradas informales (ej. "me comí dos huevos revueltos con una rebanada de pan y un café con leche") en un registro estructurado asignado al tiempo de comida correspondiente (Desayuno, Comida, Cena o Snack).
@@ -169,7 +173,7 @@ export function getEmptyNutriOutput(accion: AccionEjecutada): NutriEngineOutput 
       peso_total_preparado_g: 0,
       peso_g: 0,
       calorias_totales: 0,
-      metodo_coccion_inferido: "plancha",
+      metodo_coccion_inferido: "natural",
       puntuacion_confianza: 0.95,
       micro_preguntas_confirmacion: [],
       macronutrientes: {
@@ -241,7 +245,7 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
     base.escaneo_comida.peso_g = totalWeight;
     base.escaneo_comida.calorias_totales = Number(esc.calorias_totales) || 0;
     base.escaneo_comida.consejo_coach = esc.consejo_coach || null;
-    base.escaneo_comida.metodo_coccion_inferido = esc.metodo_coccion_inferido || "plancha";
+    base.escaneo_comida.metodo_coccion_inferido = esc.metodo_coccion_inferido || "natural";
     base.escaneo_comida.puntuacion_confianza =
       typeof esc.puntuacion_confianza === "number" ? esc.puntuacion_confianza : 0.95;
 
@@ -291,7 +295,7 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
 
     // Regla 2: Grasas ocultas
     // Solo aplicar si el método de cocción es caliente (plancha, salteado, horno, asado, frito)
-    // y no en alimentos crudos, frutas, licuados, avena o cocidos al vapor/agua.
+    // y no en alimentos crudos, frutas, bebidas, agua, productos envasados o hervidos.
     const hasOil = base.escaneo_comida.ingredientes.some((ing) => {
       const name = ing.alimento.toLowerCase();
       return name.includes("aceite") || name.includes("oliva") || name.includes("mantequilla") || name.includes("cooking oil");
@@ -317,9 +321,35 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
       dishDesc.includes("ensalada fresca") ||
       dishDesc.includes("vapor") ||
       dishDesc.includes("sin grasa") ||
-      dishDesc.includes("hervido al natural");
+      dishDesc.includes("hervido al natural") ||
+      dishDesc.includes("agua") ||
+      dishDesc.includes("water") ||
+      dishDesc.includes("bebida") ||
+      dishDesc.includes("drink") ||
+      dishDesc.includes("refresco") ||
+      dishDesc.includes("soda") ||
+      dishDesc.includes("jugo") ||
+      dishDesc.includes("zumo") ||
+      dishDesc.includes("juice") ||
+      dishDesc.includes("cafe") ||
+      dishDesc.includes("café") ||
+      dishDesc.includes("coffee") ||
+      dishDesc.includes("te") ||
+      dishDesc.includes("té") ||
+      dishDesc.includes("tea") ||
+      dishDesc.includes("infusion") ||
+      dishDesc.includes("infusión") ||
+      dishDesc.includes("envasado") ||
+      dishDesc.includes("botella") ||
+      dishDesc.includes("lata") ||
+      dishDesc.includes("no detectado") ||
+      dishDesc.includes("no comestible");
 
-    if (!hasOil && isWarmCooked && !isRawOrColdOrExempt && base.escaneo_comida.ingredientes.length > 0) {
+    const hasNutritiveCalories = base.escaneo_comida.ingredientes.some(
+      (ing) => ing.calorias > 0 || ing.grasas_g > 0 || ing.proteinas_g > 0 || ing.carbohidratos_g > 0
+    );
+
+    if (!hasOil && isWarmCooked && !isRawOrColdOrExempt && hasNutritiveCalories && base.escaneo_comida.ingredientes.length > 0) {
       base.escaneo_comida.ingredientes.push({
         alimento: "Aceite de cocción (salteado/plancha/horno)",
         peso_estimado_g: 8,

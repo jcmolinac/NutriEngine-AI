@@ -226,11 +226,22 @@ export default function HomePage() {
       }
 
       const data: NutriEngineOutput = await res.json();
+
+      if (
+        data.escaneo_comida?.nombre_plato === "Alimento no detectado" ||
+        data.escaneo_comida?.nombre_plato === "No se pudo identificar el alimento"
+      ) {
+        setErrorMessage(
+          data.escaneo_comida?.control_calidad?.advertencia_precision ||
+            "No se detectó un alimento claro. Por favor enfoca de nuevo tu plato o bebida con buena luz."
+        );
+      }
+
       setEngineState((prev) => ({
         ...prev,
         accion_ejecutada: data.accion_ejecutada || targetAction,
         escaneo_comida:
-          data.escaneo_comida?.nombre_plato !== null && data.escaneo_comida?.calorias_totales > 0
+          data.escaneo_comida?.nombre_plato != null
             ? data.escaneo_comida
             : prev.escaneo_comida,
         registro_diario:

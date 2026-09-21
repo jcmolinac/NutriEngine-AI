@@ -18,7 +18,6 @@ import {
   Box,
 } from "lucide-react";
 import { EscaneoComida, IngredienteReconocido } from "@/types/nutrition";
-import { SAMPLE_DISHES, SampleDish } from "@/lib/sample-dishes";
 import { MobileBottomSheet } from "./MobileBottomSheet";
 import { MacroBar } from "./MacroBar";
 import { PhotoQualityModal } from "./PhotoQualityModal";
@@ -68,31 +67,12 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const selectSampleDish = async (dish: SampleDish) => {
-    if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.(20);
-    }
-    setPreviewImage(dish.imageUrl);
-    try {
-      const res = await fetch(dish.imageUrl);
-      const blob = await res.blob();
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const base64 = ev.target?.result as string;
-        onScanImage(base64, blob.type || "image/jpeg");
-      };
-      reader.readAsDataURL(blob);
-    } catch {
-      onScanImage("", "image/jpeg");
-    }
-  };
-
   const {
     nombre_plato,
     peso_total_preparado_g,
     peso_g,
     calorias_totales = 0,
-    metodo_coccion_inferido = "plancha",
+    metodo_coccion_inferido = "natural",
     puntuacion_confianza = 0.95,
     micro_preguntas_confirmacion = [
       "¿Se utilizó aceite de oliva o mantequilla al cocinar el plato?",
@@ -112,9 +92,14 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     consejo_coach,
   } = escaneoData || {};
 
-  const hasScannedDish = Boolean(displayImage || (nombre_plato && calorias_totales > 0));
+  const isUnrecognized =
+    nombre_plato === "Alimento no detectado" ||
+    nombre_plato === "No se pudo identificar el alimento" ||
+    puntuacion_confianza === 0;
 
-  const baseWeight = peso_total_preparado_g || peso_g || 411;
+  const hasScannedDish = Boolean(displayImage || (nombre_plato && !isUnrecognized));
+
+  const baseWeight = (peso_total_preparado_g ?? peso_g) || 0;
 
   // Derivar pesos combinando valores del backend y ediciones manuales del usuario
   const getIngredientWeight = (idx: number, fallback: number) => {
@@ -122,11 +107,11 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
   };
 
   const currentTotalWeight = ingredientes?.length
-    ? ingredientes.reduce((acc, ing, idx) => acc + getIngredientWeight(idx, ing.peso_g || ing.peso_estimado_g || 100), 0)
+    ? ingredientes.reduce((acc, ing, idx) => acc + getIngredientWeight(idx, ing.peso_g || ing.peso_estimado_g || 0), 0)
     : baseWeight;
 
   const scaleRatio = baseWeight > 0 ? currentTotalWeight / baseWeight : 1;
-  const currentCalories = Math.round(calorias_totales * scaleRatio) || calorias_totales;
+  const currentCalories = Math.round(calorias_totales * scaleRatio);
 
   const handleWeightChange = (index: number, newWeight: number) => {
     const val = Math.max(0, newWeight);
@@ -253,43 +238,20 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
             onChange={handleFileChange}
           />
         </div>
-
-        {/* Quick Sample Dishes Carousel */}
-        <div className="pt-1">
-          <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
-            Platos de Referencia Rápida
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {SAMPLE_DISHES.map((dish) => (
-              <button
-                key={dish.id}
-                type="button"
-                onClick={() => selectSampleDish(dish)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 active:bg-fitia-yellow/20 text-left shrink-0 min-h-[44px] transition"
-              >
-                <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0">
-                  <Image
-                    src={dish.imageUrl}
-                    alt={dish.name}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-stone-900 leading-tight whitespace-nowrap">
-                    {dish.name.split(" ")[0]} {dish.name.split(" ")[1] || ""}
-                  </p>
-                  <p className="text-[10px] text-stone-500 font-mono">
-                    {dish.category}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
+
+      {isUnrecognized && (
+        <div className="p-4 rounded-3xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+          <div className="flex items-center gap-2 font-bold text-xs">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Alimento o producto no identificado</span>
+          </div>
+          <p className="text-[11px] text-amber-700 leading-relaxed">
+            {control_calidad?.advertencia_precision ||
+              "No se detectó un alimento claro en la imagen. Por favor enfoca de nuevo tu comida o producto con buena iluminación."}
+          </p>
+        </div>
+      )}
 
       {hasScannedDish ? (
         <>
@@ -322,9 +284,9 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
         {/* Barra continua horizontal proporcional dividida en los 3 colores de macros */}
         <div className="space-y-1.5 pt-1">
           <MacroBar
-            proteinPct={macronutrientes?.porcentaje_proteinas || 34}
-            carbsPct={macronutrientes?.porcentaje_carbohidratos || 29}
-            fatPct={macronutrientes?.porcentaje_grasas || 37}
+            proteinPct={macronutrientes?.porcentaje_proteinas ?? 0}
+            carbsPct={macronutrientes?.porcentaje_carbohidratos ?? 0}
+            fatPct={macronutrientes?.porcentaje_grasas ?? 0}
           />
 
           {/* Tarjetas de macros en gramos */}
@@ -332,19 +294,19 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
             <div className="p-2 rounded-2xl bg-macro-protein/10 border border-macro-protein/25">
               <span className="text-[10px] font-bold text-macro-protein uppercase block">Proteína</span>
               <p className="text-sm font-black text-fitia-dark font-mono">
-                {Math.round((macronutrientes?.proteinas_g || 44) * scaleRatio)} g
+                {Math.round((macronutrientes?.proteinas_g ?? 0) * scaleRatio)} g
               </p>
             </div>
             <div className="p-2 rounded-2xl bg-macro-carbs/15 border border-macro-carbs/35">
               <span className="text-[10px] font-bold text-[#A86F28] uppercase block">Carbos</span>
               <p className="text-sm font-black text-fitia-dark font-mono">
-                {Math.round((macronutrientes?.carbohidratos_g || 38) * scaleRatio)} g
+                {Math.round((macronutrientes?.carbohidratos_g ?? 0) * scaleRatio)} g
               </p>
             </div>
             <div className="p-2 rounded-2xl bg-macro-fat/15 border border-macro-fat/35">
               <span className="text-[10px] font-bold text-[#635F2B] uppercase block">Grasas</span>
               <p className="text-sm font-black text-fitia-dark font-mono">
-                {Math.round((macronutrientes?.grasas_g || 22) * scaleRatio)} g
+                {Math.round((macronutrientes?.grasas_g ?? 0) * scaleRatio)} g
               </p>
             </div>
           </div>
