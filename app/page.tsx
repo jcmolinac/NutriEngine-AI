@@ -31,33 +31,33 @@ import {
 } from "@/lib/mock-fallbacks";
 import { getEmptyNutriOutput } from "@/lib/nutrition-engine-service";
 
-const DEFAULT_USER_PROFILE: UserAntropoData = {
-  edad: 42,
-  genero: "masculino",
-  peso_actual_kg: 95,
-  altura_cm: 183,
-  nivel_actividad: "sedentario",
-  peso_meta_kg: 82,
-};
-
 function createCleanInitialState(): NutriEngineOutput {
   const empty = getEmptyNutriOutput("CALCULATE_TARGETS_AND_TIMELINE");
-  const calculated = getMockCalculateTargets(DEFAULT_USER_PROFILE);
-  const targetKcal = calculated.metas_y_progreso?.calorias_diarias_recomendadas || 1817;
-  const mealPlan = getMockMealPlanner(targetKcal);
-  const grocery = getMockGroceryList();
-  const coach = getMockCoachAdvice();
 
   return {
     accion_ejecutada: "CALCULATE_TARGETS_AND_TIMELINE",
     escaneo_comida: empty.escaneo_comida,
     registro_diario: empty.registro_diario,
-    metas_y_progreso: calculated.metas_y_progreso,
-    plan_comidas: mealPlan.plan_comidas,
-    lista_compras: grocery.lista_compras,
-    modulo_coach: coach.modulo_coach,
+    metas_y_progreso: {
+      tasa_metabolica_basal_bmr: 0,
+      gasto_energetico_total_tdee: 0,
+      calorias_diarias_recomendadas: 0,
+      rango_calorico: { min: 0, max: 0 },
+      macros_objetivo: { proteinas_g: 0, carbohidratos_g: 0, grasas_g: 0 },
+      curva_progreso: [],
+    },
+    plan_comidas: { dias: [] },
+    lista_compras: [],
+    modulo_coach: {
+      respuesta_consulta: null,
+      sugerencia_ayuno: {
+        protocolo: "16:8",
+        ventana_ingesta: "12:00 PM - 8:00 PM",
+        recomendacion: "Mantén buena hidratación con agua, café solo o té durante las horas de ayuno.",
+      },
+    },
     registro_agua: {
-      meta_ml: 3325,
+      meta_ml: 2000,
       consumido_ml: 0,
       vasos_registrados: [],
     },
@@ -66,7 +66,7 @@ function createCleanInitialState(): NutriEngineOutput {
       hora_inicio_ayuno: "20:00",
       horas_ayuno: 16,
       hora_fin_ventana: "20:00",
-      en_ayuno: true,
+      en_ayuno: false,
     },
     historial_dias: {},
   };
@@ -85,7 +85,7 @@ export default function HomePage() {
     () => new Date().toISOString().split("T")[0]
   );
 
-  const STORAGE_KEY = "nutriengine_pwa_v4_advanced";
+  const STORAGE_KEY = "nutriengine_pwa_v5_clean";
   const [isHydrated, setIsHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<{
     id: string;
@@ -128,10 +128,16 @@ export default function HomePage() {
     };
   }, []);
 
-  // Restaurar estado persistido en cliente tras montaje seguro
+  // Restaurar estado persistido en cliente tras montaje seguro y purgar claves de prueba
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
+        // Purgar datos de prueba previos
+        localStorage.removeItem("nutriengine_pwa_v4_advanced");
+        localStorage.removeItem("nutriengine_state_v3");
+        localStorage.removeItem("nutriengine_state_v2");
+        localStorage.removeItem("nutriengine_state_v1");
+
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -166,12 +172,13 @@ export default function HomePage() {
     try {
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("nutriengine_pwa_v4_advanced");
       }
     } catch (e) {
       console.warn(e);
     }
     setEngineState(createCleanInitialState());
-    setErrorMessage("Datos limpios restablecidos para el perfil de prueba (42 años, 95kg sedentario).");
+    setErrorMessage("Aplicación restablecida a estado limpio.");
   };
 
   const handleLogout = async () => {

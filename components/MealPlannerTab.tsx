@@ -217,7 +217,19 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
             </button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="bg-white rounded-4xl border border-dashed border-stone-300 p-8 text-center space-y-3 shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-fitia-yellow/30 text-fitia-dark flex items-center justify-center mx-auto">
+            <CalendarDays className="w-6 h-6 text-fitia-dark" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-fitia-dark">Menú Semanal no Generado</h4>
+            <p className="text-xs text-stone-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
+              Ajusta tus calorías deseadas arriba y pulsa <strong>Generar</strong> para crear tu plan de comidas de 7 días.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

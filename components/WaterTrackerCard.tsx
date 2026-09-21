@@ -11,7 +11,7 @@ interface WaterTrackerCardProps {
 }
 
 export const WaterTrackerCard: React.FC<WaterTrackerCardProps> = ({
-  metaMl = 3300,
+  metaMl = 2000,
   consumidoMl,
   onAddWater,
   onResetWater,

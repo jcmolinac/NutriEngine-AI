@@ -87,7 +87,7 @@ export const LogDiaryTab: React.FC<LogDiaryTabProps> = ({
     sodio_mg?: number;
   }>>>({});
 
-  const targetKcal = metasData?.calorias_diarias_recomendadas || 1817;
+  const targetKcal = metasData?.calorias_diarias_recomendadas || 2000;
 
   // Secciones limpias sin datos de prueba precargados
   const mealSections = React.useMemo<MealSection[]>(() => {

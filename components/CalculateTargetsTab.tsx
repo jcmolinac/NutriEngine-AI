@@ -26,47 +26,63 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
   onCalculateTargets,
   isProcessing,
 }) => {
-  const [formData, setFormData] = useState<UserAntropoData>({
-    edad: 42,
+  const [formData, setFormData] = useState<{
+    edad: number | "";
+    genero: "masculino" | "femenino";
+    peso_actual_kg: number | "";
+    altura_cm: number | "";
+    nivel_actividad: "sedentario" | "ligero" | "moderado" | "intenso";
+    peso_meta_kg: number | "";
+  }>({
+    edad: "",
     genero: "masculino",
-    peso_actual_kg: 95,
-    altura_cm: 183,
+    peso_actual_kg: "",
+    altura_cm: "",
     nivel_actividad: "sedentario",
-    peso_meta_kg: 82,
+    peso_meta_kg: "",
   });
 
   const [showTimelineSheet, setShowTimelineSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showAdaptiveModal, setShowAdaptiveModal] = useState(false);
 
-  const handleChange = (field: keyof UserAntropoData, val: any) => {
+  const handleChange = (field: string, val: any) => {
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      formData.edad === "" ||
+      formData.peso_actual_kg === "" ||
+      formData.altura_cm === "" ||
+      formData.peso_meta_kg === ""
+    ) {
+      return;
+    }
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate?.(25);
     }
-    onCalculateTargets(formData);
-  };
-
-  const applyPreset = (preset: UserAntropoData) => {
-    if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.(20);
-    }
-    setFormData(preset);
-    onCalculateTargets(preset);
+    onCalculateTargets({
+      edad: Number(formData.edad),
+      genero: formData.genero,
+      peso_actual_kg: Number(formData.peso_actual_kg),
+      altura_cm: Number(formData.altura_cm),
+      nivel_actividad: formData.nivel_actividad,
+      peso_meta_kg: Number(formData.peso_meta_kg),
+    });
   };
 
   const {
-    calorias_diarias_recomendadas = 1817,
+    calorias_diarias_recomendadas = 0,
     rango_calorico,
     macros_objetivo,
     curva_progreso,
-    tasa_metabolica_basal_bmr = 1889,
-    gasto_energetico_total_tdee = 2267,
-  } = metasData;
+    tasa_metabolica_basal_bmr = 0,
+    gasto_energetico_total_tdee = 0,
+  } = metasData || {};
+
+  const hasCalculated = calorias_diarias_recomendadas > 0;
 
   const displayBmr = tasa_metabolica_basal_bmr || Math.round(calorias_diarias_recomendadas * 0.83);
   const displayTdee = gasto_energetico_total_tdee || Math.round(calorias_diarias_recomendadas * 1.25);
@@ -126,82 +142,15 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Quick Presets Carousel */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              type="button"
-              id="preset-user-42m"
-              onClick={() =>
-                applyPreset({
-                  edad: 42,
-                  genero: "masculino",
-                  peso_actual_kg: 95,
-                  altura_cm: 183,
-                  nivel_actividad: "sedentario",
-                  peso_meta_kg: 82,
-                })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-fitia-yellow/30 border border-fitia-yellow/60 active:bg-fitia-yellow text-fitia-dark text-xs font-bold whitespace-nowrap min-h-[36px]"
-            >
-              ★ Hombre 42a (95→82kg Sedentario)
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                applyPreset({
-                  edad: 32,
-                  genero: "femenino",
-                  peso_actual_kg: 72,
-                  altura_cm: 167,
-                  nivel_actividad: "moderado",
-                  peso_meta_kg: 64,
-                })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-stone-100 active:bg-stone-200 text-stone-700 text-xs font-semibold whitespace-nowrap min-h-[36px]"
-            >
-              Definición 72→64kg
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                applyPreset({
-                  edad: 26,
-                  genero: "masculino",
-                  peso_actual_kg: 84,
-                  altura_cm: 181,
-                  nivel_actividad: "intenso",
-                  peso_meta_kg: 80,
-                })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-stone-100 active:bg-stone-200 text-stone-700 text-xs font-semibold whitespace-nowrap min-h-[36px]"
-            >
-              Atleta 84→80kg
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                applyPreset({
-                  edad: 40,
-                  genero: "femenino",
-                  peso_actual_kg: 60,
-                  altura_cm: 162,
-                  nivel_actividad: "ligero",
-                  peso_meta_kg: 60,
-                })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-stone-100 active:bg-stone-200 text-stone-700 text-xs font-semibold whitespace-nowrap min-h-[36px]"
-            >
-              Mantenimiento
-            </button>
-          </div>
-
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="text-[11px] font-bold text-stone-600 block mb-1">Edad</label>
               <input
                 type="number"
-                value={formData.edad}
-                onChange={(e) => handleChange("edad", Number(e.target.value))}
+                required
+                placeholder="Ej. 35"
+                value={formData.edad === "" ? "" : formData.edad}
+                onChange={(e) => handleChange("edad", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full h-11 min-h-[44px] rounded-xl border border-stone-300 px-3 text-xs font-semibold text-stone-900 bg-stone-50/50"
               />
             </div>
@@ -224,9 +173,11 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
               <label className="text-[11px] font-bold text-stone-600 block mb-1">Peso Actual (kg)</label>
               <input
                 type="number"
-                step="0.5"
-                value={formData.peso_actual_kg}
-                onChange={(e) => handleChange("peso_actual_kg", Number(e.target.value))}
+                step="0.1"
+                required
+                placeholder="Ej. 75.0"
+                value={formData.peso_actual_kg === "" ? "" : formData.peso_actual_kg}
+                onChange={(e) => handleChange("peso_actual_kg", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full h-11 min-h-[44px] rounded-xl border border-stone-300 px-3 text-xs font-semibold text-stone-900 bg-stone-50/50"
               />
             </div>
@@ -235,8 +186,10 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
               <label className="text-[11px] font-bold text-stone-600 block mb-1">Altura (cm)</label>
               <input
                 type="number"
-                value={formData.altura_cm}
-                onChange={(e) => handleChange("altura_cm", Number(e.target.value))}
+                required
+                placeholder="Ej. 175"
+                value={formData.altura_cm === "" ? "" : formData.altura_cm}
+                onChange={(e) => handleChange("altura_cm", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full h-11 min-h-[44px] rounded-xl border border-stone-300 px-3 text-xs font-semibold text-stone-900 bg-stone-50/50"
               />
             </div>
@@ -250,10 +203,10 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
                 onChange={(e) => handleChange("nivel_actividad", e.target.value)}
                 className="w-full h-11 min-h-[44px] rounded-xl border border-stone-300 px-2 text-xs font-semibold text-stone-900 bg-stone-50/50"
               >
-                <option value="sedentario">Sedentario</option>
-                <option value="ligero">Ligero</option>
-                <option value="moderado">Moderado</option>
-                <option value="intenso">Intenso</option>
+                <option value="sedentario">Sedentario (Poco o nada)</option>
+                <option value="ligero">Ligero (1-3 días/sem)</option>
+                <option value="moderado">Moderado (3-5 días/sem)</option>
+                <option value="intenso">Intenso (6-7 días/sem)</option>
               </select>
             </div>
 
@@ -261,9 +214,11 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
               <label className="text-[11px] font-bold text-stone-600 block mb-1">Peso Meta (kg)</label>
               <input
                 type="number"
-                step="0.5"
-                value={formData.peso_meta_kg}
-                onChange={(e) => handleChange("peso_meta_kg", Number(e.target.value))}
+                step="0.1"
+                required
+                placeholder="Ej. 68.0"
+                value={formData.peso_meta_kg === "" ? "" : formData.peso_meta_kg}
+                onChange={(e) => handleChange("peso_meta_kg", e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full h-11 min-h-[44px] rounded-xl border border-stone-300 px-3 text-xs font-semibold text-stone-900 bg-stone-50/50"
               />
             </div>
@@ -281,8 +236,22 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
         </form>
       </div>
 
-      {/* Calorie Gauge Card */}
-      <CalorieGauge
+      {!hasCalculated ? (
+        <div className="bg-white rounded-4xl border border-dashed border-stone-300 p-8 text-center space-y-3 shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-fitia-yellow/30 text-fitia-dark flex items-center justify-center mx-auto">
+            <Activity className="w-6 h-6 text-fitia-dark" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-fitia-dark">Tu Plan Nutricional está en Blanco</h4>
+            <p className="text-xs text-stone-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
+              Completa tus datos antropométricos arriba y haz clic en <strong>Calcular Presupuesto & Curva</strong> para obtener tu presupuesto calórico, macros y curva de proyección.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Calorie Gauge Card */}
+          <CalorieGauge
         currentKcal={calorias_diarias_recomendadas}
         minKcal={rango_calorico?.min || calorias_diarias_recomendadas - 150}
         maxKcal={rango_calorico?.max || calorias_diarias_recomendadas + 150}
@@ -415,8 +384,8 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
 
       {/* Fitia Weight Curve Visual Chart */}
       <WeightCurveChart
-        currentWeight={formData.peso_actual_kg}
-        targetWeight={formData.peso_meta_kg}
+        currentWeight={Number(formData.peso_actual_kg) || points[0]?.peso_proyectado_kg || 70}
+        targetWeight={Number(formData.peso_meta_kg) || points[points.length - 1]?.peso_proyectado_kg || 65}
         targetDate={points[points.length - 1]?.fecha_estimada || "Semana 12"}
       />
 
@@ -515,13 +484,15 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
           </svg>
         </div>
       </div>
+        </>
+      )}
 
       {/* Timeline Milestones Bottom Sheet */}
       <MobileBottomSheet
         isOpen={showTimelineSheet}
         onClose={() => setShowTimelineSheet(false)}
         title="Hitos Semanales de Progreso"
-        subtitle={`Proyección hacia meta de ${formData.peso_meta_kg} kg`}
+        subtitle={formData.peso_meta_kg ? `Proyección hacia meta de ${formData.peso_meta_kg} kg` : "Proyección hacia peso meta"}
       >
         <div className="space-y-2.5 py-1">
           {points.map((pt, idx) => (
@@ -564,7 +535,14 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
       <ClinicalReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
-        userData={formData}
+        userData={{
+          edad: Number(formData.edad) || 30,
+          genero: formData.genero,
+          peso_actual_kg: Number(formData.peso_actual_kg) || 70,
+          altura_cm: Number(formData.altura_cm) || 170,
+          nivel_actividad: formData.nivel_actividad,
+          peso_meta_kg: Number(formData.peso_meta_kg) || 65,
+        }}
         metasData={metasData}
       />
 
@@ -572,11 +550,23 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
       <AdaptiveBudgetModal
         isOpen={showAdaptiveModal}
         onClose={() => setShowAdaptiveModal(false)}
-        userData={formData}
+        userData={{
+          edad: Number(formData.edad) || 30,
+          genero: formData.genero,
+          peso_actual_kg: Number(formData.peso_actual_kg) || 70,
+          altura_cm: Number(formData.altura_cm) || 170,
+          nivel_actividad: formData.nivel_actividad,
+          peso_meta_kg: Number(formData.peso_meta_kg) || 65,
+        }}
         currentBudget={calorias_diarias_recomendadas}
-        onApplyNewBudget={(newBudget, newTdee) => {
+        onApplyNewBudget={(_newBudget, _newTdee) => {
           onCalculateTargets({
-            ...formData,
+            edad: Number(formData.edad) || 30,
+            genero: formData.genero,
+            peso_actual_kg: Number(formData.peso_actual_kg) || 70,
+            altura_cm: Number(formData.altura_cm) || 170,
+            nivel_actividad: formData.nivel_actividad,
+            peso_meta_kg: Number(formData.peso_meta_kg) || 65,
           });
         }}
       />

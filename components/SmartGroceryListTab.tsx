@@ -117,59 +117,73 @@ export const SmartGroceryListTab: React.FC<SmartGroceryListTabProps> = ({
       </div>
 
       {/* Categories by Supermarket Aisle */}
-      <div className="space-y-3">
-        {groceryData?.map((cat, catIdx) => (
-          <div
-            key={catIdx}
-            className="bg-white rounded-4xl border border-stone-200/90 p-4 shadow-sm space-y-2.5"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-fitia-green" />
-                <h4 className="text-sm font-bold text-fitia-dark">{cat.categoria}</h4>
-              </div>
-              <span className="text-[10px] text-stone-400 font-semibold font-mono">
-                {cat.items?.length || 0} ítems
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {cat.items?.map((it, itemIdx) => {
-                const itemKey = `${cat.categoria}-${it.alimento}-${itemIdx}`;
-                const isChecked = !!checkedItems[itemKey];
-
-                return (
-                  <button
-                    key={itemIdx}
-                    type="button"
-                    onClick={() => toggleItem(itemKey)}
-                    className={`w-full p-3 rounded-2xl text-left flex items-center justify-between gap-3 min-h-[48px] transition border ${
-                      isChecked
-                        ? "bg-stone-50 border-stone-200 opacity-60 line-through text-stone-400"
-                        : "bg-white border-stone-150 hover:bg-fitia-surface active:bg-fitia-yellow/20 text-stone-800"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg flex items-center justify-center">
-                        {isChecked ? (
-                          <CheckSquare className="w-5 h-5 text-fitia-green" />
-                        ) : (
-                          <Square className="w-5 h-5 text-stone-400" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold leading-tight">{it.alimento}</span>
-                    </div>
-
-                    <span className="text-xs font-mono font-bold text-stone-600 bg-fitia-surface px-2 py-0.5 rounded-lg shrink-0 border border-stone-200/60">
-                      {it.cantidad_total}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+      {!groceryData || groceryData.length === 0 ? (
+        <div className="bg-white rounded-4xl border border-dashed border-stone-300 p-8 text-center space-y-3 shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-fitia-yellow/30 text-fitia-dark flex items-center justify-center mx-auto">
+            <ShoppingCart className="w-6 h-6 text-fitia-dark" />
           </div>
-        ))}
-      </div>
+          <div>
+            <h4 className="text-sm font-black text-fitia-dark">Lista de Compras Vacía</h4>
+            <p className="text-xs text-stone-500 mt-1.5 max-w-xs mx-auto leading-relaxed">
+              Genera primero tu plan de comidas en la pestaña <strong>Plan</strong> y haz clic en <strong>Generar Lista de Compras</strong> para ver tus ingredientes agrupados por pasillo.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {groceryData.map((cat, catIdx) => (
+            <div
+              key={catIdx}
+              className="bg-white rounded-4xl border border-stone-200/90 p-4 shadow-sm space-y-2.5"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-fitia-green" />
+                  <h4 className="text-sm font-bold text-fitia-dark">{cat.categoria}</h4>
+                </div>
+                <span className="text-[10px] text-stone-400 font-semibold font-mono">
+                  {cat.items?.length || 0} ítems
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                {cat.items?.map((it, itemIdx) => {
+                  const itemKey = `${cat.categoria}-${it.alimento}-${itemIdx}`;
+                  const isChecked = !!checkedItems[itemKey];
+
+                  return (
+                    <button
+                      key={itemIdx}
+                      type="button"
+                      onClick={() => toggleItem(itemKey)}
+                      className={`w-full p-3 rounded-2xl text-left flex items-center justify-between gap-3 min-h-[48px] transition border ${
+                        isChecked
+                          ? "bg-stone-50 border-stone-200 opacity-60 line-through text-stone-400"
+                          : "bg-white border-stone-150 hover:bg-fitia-surface active:bg-fitia-yellow/20 text-stone-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center">
+                          {isChecked ? (
+                            <CheckSquare className="w-5 h-5 text-fitia-green" />
+                          ) : (
+                            <Square className="w-5 h-5 text-stone-400" />
+                          )}
+                        </div>
+                        <span className="text-xs font-bold leading-tight">{it.alimento}</span>
+                      </div>
+
+                      <span className="text-xs font-mono font-bold text-stone-600 bg-fitia-surface px-2 py-0.5 rounded-lg shrink-0 border border-stone-200/60">
+                        {it.cantidad_total}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
