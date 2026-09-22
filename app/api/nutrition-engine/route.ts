@@ -11,6 +11,8 @@ import {
 } from "@/lib/mock-fallbacks";
 import { AccionEjecutada } from "@/types/nutrition";
 
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   let targetAction: AccionEjecutada = "SCAN_FOOD";
   let inputText: string | undefined;
@@ -171,20 +173,20 @@ Acción solicitada o detectada: "${targetAction}"
 
     const candidateModels: string[] = [
       process.env.GEMINI_MODEL,
-      "gemini-flash-latest",
+      "gemini-flash-lite-latest",
       "gemini-3.8-flash",
       "gemini-3.5-flash",
+      "gemini-flash-latest",
       "gemini-3.6-flash",
-      "gemini-flash-lite-latest",
     ].filter((m): m is string => Boolean(m));
 
     let response: any = null;
-    let modelUsed = "gemini-flash-latest";
+    let modelUsed = "gemini-flash-lite-latest";
     let lastError: any = null;
 
     for (const model of candidateModels) {
       try {
-        response = await ai.models.generateContent({
+        const generatePromise = ai.models.generateContent({
           model,
           contents: { parts },
           config: {
@@ -192,7 +194,14 @@ Acción solicitada o detectada: "${targetAction}"
             responseMimeType: "application/json",
           },
         });
-        if (response && response.text) {
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout de 7s en modelo ${model}`)), 7000)
+        );
+
+        const res: any = await Promise.race([generatePromise, timeoutPromise]);
+        if (res && res.text) {
+          response = res;
           modelUsed = model;
           break;
         }
