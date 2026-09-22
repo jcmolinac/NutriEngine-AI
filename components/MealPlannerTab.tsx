@@ -13,13 +13,19 @@ import {
   ChevronUp,
   Square,
   CheckSquare,
+  CheckCircle2,
+  Filter,
 } from "lucide-react";
 import { PlanComidas, DiaPlan, CategoriaCompra } from "@/types/nutrition";
+import {
+  CLINICAL_INGREDIENTS,
+  DEFAULT_SELECTED_INGREDIENTS,
+} from "@/lib/meal-planner-generator";
 
 interface MealPlannerTabProps {
   planData: PlanComidas;
   groceryData?: CategoriaCompra[];
-  onGeneratePlan: (calorieTarget?: number) => Promise<void>;
+  onGeneratePlan: (calorieTarget?: number, selectedFoods?: string[]) => Promise<void>;
   onGenerateGroceryListFromPlan?: (plan: PlanComidas) => Promise<void>;
   isProcessing: boolean;
 }
@@ -33,7 +39,11 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [targetCalories, setTargetCalories] = useState(1800);
   const [isGroceryOpen, setIsGroceryOpen] = useState(false);
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
+  const [selectedIngredientIds, setSelectedIngredientIds] = useState<string[]>(
+    DEFAULT_SELECTED_INGREDIENTS
+  );
+  const [checkedGroceryItems, setCheckedGroceryItems] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
 
   const dias = planData?.dias || [];
@@ -46,11 +56,32 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
     setSelectedDayIndex(idx);
   };
 
-  const toggleChecked = (key: string) => {
+  const toggleIngredient = (id: string) => {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate?.(15);
     }
-    setCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }));
+    setSelectedIngredientIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllIngredients = () => {
+    setSelectedIngredientIds(CLINICAL_INGREDIENTS.map((i) => i.id));
+  };
+
+  const selectBasics = () => {
+    setSelectedIngredientIds(DEFAULT_SELECTED_INGREDIENTS);
+  };
+
+  const clearIngredients = () => {
+    setSelectedIngredientIds([]);
+  };
+
+  const toggleGroceryChecked = (key: string) => {
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(15);
+    }
+    setCheckedGroceryItems((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleCopyGroceryText = () => {
@@ -72,17 +103,126 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
   };
 
   const totalGroceryCount = groceryData.reduce((acc, c) => acc + (c.items?.length || 0), 0);
-  const purchasedCount = Object.values(checkedItems).filter(Boolean).length;
-  const progressPct = totalGroceryCount > 0 ? Math.round((purchasedCount / totalGroceryCount) * 100) : 0;
+  const purchasedCount = Object.values(checkedGroceryItems).filter(Boolean).length;
+  const progressPct =
+    totalGroceryCount > 0 ? Math.round((purchasedCount / totalGroceryCount) * 100) : 0;
+
+  // Agrupar alimentos por categoría para el selector
+  const categories = [
+    { key: "proteinas", label: "🥩 Proteínas (BEDCA/USDA)" },
+    { key: "carbohidratos", label: "🍚 Carbohidratos & Granos" },
+    { key: "vegetales", label: "🥦 Vegetales & Fibra" },
+    { key: "grasas", label: "🥑 Grasas Saludables" },
+  ] as const;
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-3.5 pb-2">
-      {/* Target & Generation Card */}
+    <div className="w-full max-w-md mx-auto space-y-3.5 pb-20">
+      {/* 1. SELECTOR DE ALIMENTOS PREFERIDOS */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-3">
+        <button
+          type="button"
+          onClick={() => setIsIngredientsOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between text-left group"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-900">
+              <Filter className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-black text-stone-900">
+                  Tus Alimentos Preferidos
+                </h4>
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black">
+                  {selectedIngredientIds.length} elegidos
+                </span>
+              </div>
+              <p className="text-[10px] text-stone-500">
+                Elige qué comer y el menú semanal se creará solo con ellos
+              </p>
+            </div>
+          </div>
+          <div className="w-7 h-7 rounded-xl bg-stone-100 flex items-center justify-center text-stone-600 group-hover:bg-stone-200 transition">
+            {isIngredientsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {isIngredientsOpen && (
+          <div className="space-y-3 pt-2 border-t border-stone-100">
+            {/* Botones de acción rápida */}
+            <div className="flex items-center gap-1.5 justify-between">
+              <span className="text-[10px] font-semibold text-stone-400">Atajos:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={selectBasics}
+                  className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-[10px] font-bold text-stone-700 transition"
+                >
+                  Básicos
+                </button>
+                <button
+                  type="button"
+                  onClick={selectAllIngredients}
+                  className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-[10px] font-bold text-stone-700 transition"
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={clearIngredients}
+                  className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-[10px] font-bold text-stone-500 transition"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            {/* Listado agrupado por categorías */}
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {categories.map((cat) => {
+                const itemsInCat = CLINICAL_INGREDIENTS.filter((i) => i.category === cat.key);
+                return (
+                  <div key={cat.key} className="space-y-1">
+                    <span className="text-[10px] font-black text-stone-600 uppercase tracking-wider block">
+                      {cat.label}
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {itemsInCat.map((item) => {
+                        const isSelected = selectedIngredientIds.includes(item.id);
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleIngredient(item.id)}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold transition active:scale-95 border ${
+                              isSelected
+                                ? "bg-fitia-dark text-white border-fitia-dark shadow-2xs font-bold"
+                                : "bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100"
+                            }`}
+                          >
+                            <span>{item.emoji}</span>
+                            <span>{item.name}</span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3 h-3 text-fitia-yellow ml-0.5" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. OBJETIVO CALÓRICO Y GENERADOR DEL MENÚ */}
       <div className="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-fitia-green uppercase tracking-wider">
-              Menú Semanal Inteligente
+              Menú Semanal Personalizado
             </span>
             <h3 className="text-base font-black text-fitia-dark leading-tight">
               Plan Lunes a Domingo
@@ -115,13 +255,19 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
               if (typeof window !== "undefined" && "vibrate" in navigator) {
                 navigator.vibrate?.(25);
               }
-              onGeneratePlan(targetCalories);
+              onGeneratePlan(targetCalories, selectedIngredientIds);
             }}
             disabled={isProcessing}
             className="h-11 px-4 rounded-2xl bg-fitia-yellow hover:bg-[#F5BF00] active:scale-95 text-fitia-dark text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs transition disabled:opacity-50 shrink-0"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isProcessing ? "animate-spin" : ""}`} />
-            <span>{isProcessing ? "Generando..." : dias.length > 0 ? "Regenerar" : "Generar Menú"}</span>
+            <span>
+              {isProcessing
+                ? "Generando..."
+                : dias.length > 0
+                ? "Regenerar"
+                : "Generar Menú"}
+            </span>
           </button>
         </div>
 
@@ -142,7 +288,11 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
                       : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
                   }`}
                 >
-                  <span className={`text-[10px] ${isSelected ? "text-fitia-yellow" : "text-stone-400"} font-bold`}>
+                  <span
+                    className={`text-[10px] ${
+                      isSelected ? "text-fitia-yellow" : "text-stone-400"
+                    }`}
+                  >
                     {d.dia.slice(0, 3)}
                   </span>
                   <span className="text-xs font-mono font-black mt-0.5">
@@ -155,10 +305,10 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
         )}
       </div>
 
-      {/* Selected Day Content */}
+      {/* 3. DÍA SELECCIONADO Y SUS COMIDAS */}
       {activeDia ? (
         <div className="space-y-3">
-          {/* Day Macro Overview Header */}
+          {/* Macro Overview Header */}
           <div className="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -173,15 +323,21 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
             <div className="grid grid-cols-3 gap-2 pt-1 text-center text-xs font-mono">
               <div className="p-2 rounded-2xl bg-rose-50 border border-rose-100">
                 <span className="text-[9px] text-rose-700 font-bold block">Proteína</span>
-                <span className="font-black text-stone-900">{activeDia.resumen_dia?.proteinas_g}g</span>
+                <span className="font-black text-stone-900">
+                  {activeDia.resumen_dia?.proteinas_g}g
+                </span>
               </div>
               <div className="p-2 rounded-2xl bg-amber-50 border border-amber-100">
                 <span className="text-[9px] text-amber-700 font-bold block">Carbos</span>
-                <span className="font-black text-stone-900">{activeDia.resumen_dia?.carbs_g}g</span>
+                <span className="font-black text-stone-900">
+                  {activeDia.resumen_dia?.carbs_g}g
+                </span>
               </div>
               <div className="p-2 rounded-2xl bg-emerald-50 border border-emerald-100">
                 <span className="text-[9px] text-emerald-700 font-bold block">Grasas</span>
-                <span className="font-black text-stone-900">{activeDia.resumen_dia?.grasas_g}g</span>
+                <span className="font-black text-stone-900">
+                  {activeDia.resumen_dia?.grasas_g}g
+                </span>
               </div>
             </div>
           </div>
@@ -216,7 +372,9 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
                 </h5>
 
                 <div className="flex items-center justify-between pt-1.5 border-t border-stone-100 text-xs">
-                  <span className="font-mono font-black text-stone-900">{comida.calorias} kcal</span>
+                  <span className="font-mono font-black text-stone-900">
+                    {comida.calorias} kcal
+                  </span>
                   <div className="flex items-center gap-2 font-mono text-[11px] text-stone-500">
                     <span className="text-rose-700 font-bold">{comida.proteinas_g}g P</span>
                     <span>•</span>
@@ -229,7 +387,7 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
             ))}
           </div>
 
-          {/* LISTA DE COMPRAS INTEGRADA DIRECTAMENTE EN EL PLAN */}
+          {/* 4. LISTA DE COMPRAS INTEGRADA */}
           <div className="bg-white rounded-3xl border border-stone-200/90 p-4 space-y-3 shadow-sm">
             <button
               type="button"
@@ -252,7 +410,7 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
                   <p className="text-[10px] text-stone-500">
                     {totalGroceryCount > 0
                       ? `${purchasedCount} de ${totalGroceryCount} artículos comprados`
-                      : "Generada a partir de los 7 días"}
+                      : "Generada con tus alimentos seleccionados"}
                   </p>
                 </div>
               </div>
@@ -263,7 +421,6 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
 
             {isGroceryOpen && (
               <div className="space-y-3 pt-2 border-t border-stone-100">
-                {/* Botón copiar lista */}
                 {groceryData.length > 0 && (
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 h-2 rounded-full bg-stone-100 overflow-hidden">
@@ -277,29 +434,35 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
                       onClick={handleCopyGroceryText}
                       className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-800 text-[11px] font-bold flex items-center gap-1.5 transition"
                     >
-                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-500" />}
+                      {copied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-stone-500" />
+                      )}
                       <span>{copied ? "¡Copiada!" : "Copiar para WhatsApp"}</span>
                     </button>
                   </div>
                 )}
 
-                {/* Categorías por pasillo */}
                 {groceryData.length > 0 ? (
                   <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                     {groceryData.map((cat, cIdx) => (
-                      <div key={cIdx} className="space-y-1 bg-stone-50/70 p-2.5 rounded-2xl border border-stone-200/70">
+                      <div
+                        key={cIdx}
+                        className="space-y-1 bg-stone-50/70 p-2.5 rounded-2xl border border-stone-200/70"
+                      >
                         <span className="text-[10px] font-black text-stone-800 uppercase tracking-wider block">
                           {cat.categoria}
                         </span>
                         <div className="space-y-1 pt-1">
                           {cat.items?.map((it, itIdx) => {
                             const key = `${cat.categoria}-${itIdx}`;
-                            const isChecked = !!checkedItems[key];
+                            const isChecked = !!checkedGroceryItems[key];
                             return (
                               <button
                                 key={itIdx}
                                 type="button"
-                                onClick={() => toggleChecked(key)}
+                                onClick={() => toggleGroceryChecked(key)}
                                 className="w-full flex items-center justify-between text-left py-1 px-1 rounded-lg hover:bg-white/80 transition"
                               >
                                 <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
@@ -310,7 +473,9 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
                                   )}
                                   <span
                                     className={`text-xs truncate ${
-                                      isChecked ? "line-through text-stone-400" : "text-stone-800 font-medium"
+                                      isChecked
+                                        ? "line-through text-stone-400"
+                                        : "text-stone-800 font-medium"
                                     }`}
                                   >
                                     {it.alimento}
@@ -343,7 +508,7 @@ export const MealPlannerTab: React.FC<MealPlannerTabProps> = ({
           <div>
             <h4 className="text-sm font-black text-fitia-dark">Menú Semanal no Generado</h4>
             <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto leading-relaxed">
-              Ajusta tus calorías arriba y pulsa <strong>Generar Menú</strong> para crear tu plan de comidas de 7 días.
+              Selecciona tus alimentos arriba y pulsa <strong>Generar Menú</strong> para crear tu plan de comidas de 7 días.
             </p>
           </div>
         </div>

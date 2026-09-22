@@ -145,20 +145,20 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
       : "";
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-4 pb-2">
+    <div className="w-full max-w-md mx-auto space-y-4 pb-20">
       {/* Anthropometric Calculator Card */}
-      <div className="bg-fitia-cream rounded-4xl border border-stone-200/90 p-4 shadow-sm space-y-3.5">
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-3.5">
         <div className="flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-fitia-green tracking-wider uppercase">
-              Parámetros
+              Perfil del Usuario
             </span>
             <h3 className="text-base font-black text-fitia-dark leading-tight">
-              Datos Antropométricos
+              Ficha & Datos Antropométricos
             </h3>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="px-2 py-0.5 rounded-full bg-fitia-surface text-stone-700 text-[10px] font-bold border border-stone-200">
+            <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 text-[10px] font-bold border border-stone-200">
               Harris-Benedict
             </span>
             {hasCalculated && onResetTargets && (

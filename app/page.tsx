@@ -31,6 +31,10 @@ import {
   getMockCoachAdvice,
 } from "@/lib/mock-fallbacks";
 import { getEmptyNutriOutput } from "@/lib/nutrition-engine-service";
+import {
+  generateWeeklyPlanFromIngredients,
+  DEFAULT_SELECTED_INGREDIENTS,
+} from "@/lib/meal-planner-generator";
 
 function createCleanInitialState(): NutriEngineOutput {
   const empty = getEmptyNutriOutput("CALCULATE_TARGETS_AND_TIMELINE");
@@ -49,13 +53,14 @@ function createCleanInitialState(): NutriEngineOutput {
     },
     plan_comidas: { dias: [] },
     lista_compras: [],
-    modulo_coach: {
-      respuesta_consulta: null,
-      sugerencia_ayuno: {
-        protocolo: "16:8",
-        ventana_ingesta: "12:00 PM - 8:00 PM",
-        recomendacion: "Mantén buena hidratación con agua, café solo o té durante las horas de ayuno.",
-      },
+    modulo_coach: empty.modulo_coach,
+    perfil_usuario: {
+      edad: 30,
+      genero: "masculino",
+      peso_actual_kg: 75,
+      altura_cm: 175,
+      nivel_actividad: "moderado",
+      peso_meta_kg: 70,
     },
     registro_agua: {
       meta_ml: 2000,
@@ -74,7 +79,7 @@ function createCleanInitialState(): NutriEngineOutput {
 }
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<AccionEjecutada>("CALCULATE_TARGETS_AND_TIMELINE");
+  const [activeTab, setActiveTab] = useState<AccionEjecutada>("LOG_DIARY_TEXT_OR_VOICE");
   const [showJsonDrawer, setShowJsonDrawer] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -482,33 +487,20 @@ export default function HomePage() {
     await callNutritionEngine({ userData }, "CALCULATE_TARGETS_AND_TIMELINE");
   };
 
-  const handleGeneratePlan = async (calorieTarget?: number) => {
+  const handleGeneratePlan = async (calorieTarget?: number, selectedFoods?: string[]) => {
     setActiveTab("MEAL_PLANNER");
     const targetKcal = calorieTarget && calorieTarget > 1000 ? calorieTarget : 1800;
-    // Generación inmediata y determinista sin bloqueos de red (<50ms)
-    const immediatePlan = getMockMealPlanner(targetKcal);
-    const immediateGrocery = getMockGroceryList();
+    // Generación inmediata con los alimentos seleccionados por el usuario
+    const { plan, groceryList } = generateWeeklyPlanFromIngredients(
+      selectedFoods && selectedFoods.length > 0 ? selectedFoods : DEFAULT_SELECTED_INGREDIENTS,
+      targetKcal
+    );
     setEngineState((prev) => ({
       ...prev,
       accion_ejecutada: "MEAL_PLANNER",
-      plan_comidas: immediatePlan.plan_comidas,
-      lista_compras: immediateGrocery.lista_compras,
+      plan_comidas: plan,
+      lista_compras: groceryList,
     }));
-
-    // Opcionalmente consultar API con timeout controlado
-    try {
-      await callNutritionEngine(
-        {
-          mealPlanPreferences: {
-            caloriasObjetivo: targetKcal,
-            dias: ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"],
-          },
-        },
-        "MEAL_PLANNER"
-      );
-    } catch (e) {
-      console.warn("Plan nutricional estructurado local aplicado:", e);
-    }
   };
 
   const handleGenerateGroceryListFromPlan = async (plan: PlanComidas) => {
