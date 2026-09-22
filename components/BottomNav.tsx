@@ -22,7 +22,7 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
       aria-label="Barra de Navegación Móvil Fitia"
       className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-md border-t border-neutral-100 bg-white/95 backdrop-blur-md pb-[max(0.6rem,env(safe-area-inset-bottom))] select-none shadow-lg"
     >
-      <div className="flex h-16 items-center justify-around px-2">
+      <div className="flex h-16 items-center justify-around px-1.5">
         {/* 1. Diario (Registro diario de comidas, hábitos, hidratación y ayuno) */}
         <button
           id="nav-tab-diary"
@@ -31,7 +31,7 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
             triggerHaptic();
             onTabChange("LOG_DIARY_TEXT_OR_VOICE");
           }}
-          className={`flex flex-col items-center gap-1 text-[11px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
             activeTab === "LOG_DIARY_TEXT_OR_VOICE"
               ? "text-fitia-dark font-black"
               : "text-neutral-400 hover:text-neutral-600"
@@ -56,7 +56,7 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
             triggerHaptic();
             onTabChange("MEAL_PLANNER");
           }}
-          className={`flex flex-col items-center gap-1 text-[11px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
             activeTab === "MEAL_PLANNER"
               ? "text-fitia-dark font-black"
               : "text-neutral-400 hover:text-neutral-600"
@@ -73,7 +73,7 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
           <span>Plan</span>
         </button>
 
-        {/* 3. Botón Central Destacado en Amarillo Fitia (#FFC800) para Escáner con IA */}
+        {/* 3. BOTÓN CENTRAL ESCÁNER 100% CENTRADO (Disparador destacado en Amarillo Fitia) */}
         <div className="flex flex-col items-center justify-center -mt-6">
           <button
             id="nav-central-scanner-btn"
@@ -105,7 +105,32 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
           </span>
         </div>
 
-        {/* 4. Perfil (Información Personal, Datos Antropométricos, BMR/TDEE y Curva) */}
+        {/* 4. Progreso (Evolución de Peso Real, Balance Calórico y Racha de Hábitos) */}
+        <button
+          id="nav-tab-progress"
+          type="button"
+          onClick={() => {
+            triggerHaptic();
+            onTabChange("PROGRESS_METRICS");
+          }}
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
+            activeTab === "PROGRESS_METRICS"
+              ? "text-fitia-dark font-black"
+              : "text-neutral-400 hover:text-neutral-600"
+          }`}
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={activeTab === "PROGRESS_METRICS" ? 2.5 : 2.0}
+              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+            />
+          </svg>
+          <span>Progreso</span>
+        </button>
+
+        {/* 5. Perfil (Información Personal, Datos Antropométricos, BMR/TDEE y Cuenta) */}
         <button
           id="nav-tab-profile"
           type="button"
@@ -113,7 +138,7 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
             triggerHaptic();
             onTabChange("CALCULATE_TARGETS_AND_TIMELINE");
           }}
-          className={`flex flex-col items-center gap-1 text-[11px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
             activeTab === "CALCULATE_TARGETS_AND_TIMELINE"
               ? "text-fitia-dark font-black"
               : "text-neutral-400 hover:text-neutral-600"

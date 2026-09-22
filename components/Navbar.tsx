@@ -2,10 +2,7 @@
 
 import React from "react";
 import {
-  Camera,
-  Mic,
   User as UserIcon,
-  CalendarDays,
   Activity,
   LogOut,
 } from "lucide-react";
@@ -23,55 +20,14 @@ interface NavbarProps {
   onLogout?: () => void;
 }
 
-export const TABS: Array<{
-  id: AccionEjecutada;
-  label: string;
-  mobileLabel: string;
-  icon: React.ReactNode;
-}> = [
-  {
-    id: "LOG_DIARY_TEXT_OR_VOICE",
-    label: "Diario",
-    mobileLabel: "Diario",
-    icon: <Mic className="w-3.5 h-3.5" />,
-  },
-  {
-    id: "MEAL_PLANNER",
-    label: "Plan",
-    mobileLabel: "Plan",
-    icon: <CalendarDays className="w-3.5 h-3.5" />,
-  },
-  {
-    id: "SCAN_FOOD",
-    label: "Cámara",
-    mobileLabel: "Cámara",
-    icon: <Camera className="w-3.5 h-3.5" />,
-  },
-  {
-    id: "CALCULATE_TARGETS_AND_TIMELINE",
-    label: "Perfil",
-    mobileLabel: "Perfil",
-    icon: <UserIcon className="w-3.5 h-3.5" />,
-  },
-];
-
 export const Navbar: React.FC<NavbarProps> = ({
-  activeTab,
-  setActiveTab,
   currentUser,
   onOpenAuthModal,
   onLogout,
 }) => {
-  const handleTabClick = (tabId: AccionEjecutada) => {
-    if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate?.(25);
-    }
-    setActiveTab(tabId);
-  };
-
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-2xs select-none pt-[max(0.5rem,env(safe-area-inset-top))]">
-      <div className="w-full px-3.5 pb-2.5">
+      <div className="w-full px-4 py-2.5">
         <div className="flex items-center justify-between h-10">
           {/* Mobile Brand Identity */}
           <div className="flex items-center gap-2">
@@ -127,31 +83,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
           </div>
-        </div>
-
-        {/* Segmented Control 100% Native: 4 columnas exactas sin desbordamiento ni scroll */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100/90 rounded-2xl mt-1.5 border border-stone-200/70">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                id={`chip-tab-${tab.id.toLowerCase()}`}
-                type="button"
-                onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center justify-center gap-1 py-1.5 px-0.5 rounded-xl text-[11px] font-bold transition-all ${
-                  isActive
-                    ? "bg-white text-fitia-dark shadow-xs font-black ring-1 ring-stone-200/80"
-                    : "text-stone-500 hover:text-stone-900 active:bg-stone-200/50"
-                }`}
-              >
-                <span className={isActive ? "text-amber-600" : "text-stone-400"}>
-                  {tab.icon}
-                </span>
-                <span>{tab.mobileLabel}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
     </header>

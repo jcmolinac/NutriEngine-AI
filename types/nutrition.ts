@@ -4,7 +4,8 @@ export type AccionEjecutada =
   | "CALCULATE_TARGETS_AND_TIMELINE"
   | "MEAL_PLANNER"
   | "SMART_GROCERY_LIST"
-  | "COACH_ADVICE";
+  | "COACH_ADVICE"
+  | "PROGRESS_METRICS";
 
 export interface FuenteVerificada {
   base_datos: "BEDCA" | "USDA" | "OPENFOODFACTS" | "AI_ESTIMATED";
@@ -221,6 +222,7 @@ export interface NutriEngineOutput {
   estado_ayuno?: EstadoAyuno;
   historial_dias?: Record<string, RegistroDiario>;
   ajustes_adaptativos?: AjusteAdaptativoTDEE[];
+  registro_pesajes?: Array<{ fecha: string; peso_kg: number; nota?: string }>;
 }
 
 export interface UserAntropoData {

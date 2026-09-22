@@ -9,6 +9,7 @@ import { CalculateTargetsTab } from "@/components/CalculateTargetsTab";
 import { MealPlannerTab } from "@/components/MealPlannerTab";
 import { SmartGroceryListTab } from "@/components/SmartGroceryListTab";
 import { CoachAdviceTab } from "@/components/CoachAdviceTab";
+import { ProgressTab } from "@/components/ProgressTab";
 import { MobileCameraViewfinder } from "@/components/MobileCameraViewfinder";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -533,6 +534,33 @@ export default function HomePage() {
     );
   };
 
+  const handleLogWeight = (weight: number, dateIso: string) => {
+    setEngineState((prev) => {
+      const currentList = prev.registro_pesajes || [];
+      const updatedList = [
+        ...currentList.filter((item) => item.fecha !== dateIso),
+        { fecha: dateIso, peso_kg: weight },
+      ];
+      const prevProfile = prev.perfil_usuario;
+      const updatedProfile: UserAntropoData | null = prevProfile
+        ? {
+            edad: prevProfile.edad,
+            genero: prevProfile.genero,
+            peso_actual_kg: weight,
+            altura_cm: prevProfile.altura_cm,
+            nivel_actividad: prevProfile.nivel_actividad,
+            peso_meta_kg: prevProfile.peso_meta_kg,
+          }
+        : null;
+
+      return {
+        ...prev,
+        perfil_usuario: updatedProfile,
+        registro_pesajes: updatedList,
+      };
+    });
+  };
+
   return (
     <div className="w-full h-dvh min-h-dvh bg-stone-950 flex items-center justify-center overflow-hidden select-none">
       {/* 100% Mobile-Only Smartphone Frame Viewport */}
@@ -606,6 +634,16 @@ export default function HomePage() {
               onCalculateTargets={handleCalculateTargets}
               onResetTargets={handleResetState}
               isProcessing={isProcessing}
+            />
+          )}
+
+          {activeTab === "PROGRESS_METRICS" && (
+            <ProgressTab
+              metasData={engineState.metas_y_progreso}
+              currentWeight={engineState.perfil_usuario?.peso_actual_kg || 78}
+              targetWeight={engineState.perfil_usuario?.peso_meta_kg || 72}
+              historialDias={engineState.historial_dias}
+              onLogWeight={handleLogWeight}
             />
           )}
 
