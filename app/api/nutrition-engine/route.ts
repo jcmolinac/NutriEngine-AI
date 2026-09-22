@@ -179,10 +179,7 @@ Acción solicitada o detectada: "${targetAction}"
       process.env.GEMINI_MODEL,
       "gemini-flash-lite-latest",
       "gemini-3.8-flash",
-      "gemini-3.5-flash",
-      "gemini-flash-latest",
-      "gemini-3.6-flash",
-    ].filter((m): m is string => Boolean(m));
+    ].filter((m): m is string => Boolean(m)).slice(0, 2);
 
     let response: any = null;
     let modelUsed = "gemini-flash-lite-latest";
@@ -200,7 +197,7 @@ Acción solicitada o detectada: "${targetAction}"
         });
 
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout de 7s en modelo ${model}`)), 7000)
+          setTimeout(() => reject(new Error(`Timeout de 4.5s en modelo ${model}`)), 4500)
         );
 
         const res: any = await Promise.race([generatePromise, timeoutPromise]);

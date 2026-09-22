@@ -104,26 +104,6 @@ export function BottomNav({ activeTab, onTabChange, onOpenScanner }: BottomNavPr
           </svg>
           <span>Plan</span>
         </button>
-
-        {/* Perfil & Coach Nutricional */}
-        <button
-          id="nav-tab-coach"
-          type="button"
-          onClick={() => {
-            triggerHaptic();
-            onTabChange("COACH_ADVICE");
-          }}
-          className={`flex flex-col items-center gap-1 text-[11px] font-bold transition-all min-h-[44px] min-w-[44px] justify-center ${
-            activeTab === "COACH_ADVICE"
-              ? "text-fitia-dark font-black"
-              : "text-neutral-400 hover:text-neutral-600"
-          }`}
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          <span>Coach</span>
-        </button>
       </div>
     </nav>
   );

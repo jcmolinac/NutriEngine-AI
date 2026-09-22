@@ -56,18 +56,6 @@ export const TABS: Array<{
     mobileLabel: "Plan",
     icon: <CalendarDays className="w-4 h-4" />,
   },
-  {
-    id: "SMART_GROCERY_LIST",
-    label: "5. Lista de Compras",
-    mobileLabel: "Compras",
-    icon: <ShoppingCart className="w-4 h-4" />,
-  },
-  {
-    id: "COACH_ADVICE",
-    label: "6. Coach Nutricional",
-    mobileLabel: "Coach",
-    icon: <Sparkles className="w-4 h-4" />,
-  },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({

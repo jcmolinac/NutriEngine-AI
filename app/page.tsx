@@ -484,15 +484,31 @@ export default function HomePage() {
 
   const handleGeneratePlan = async (calorieTarget?: number) => {
     setActiveTab("MEAL_PLANNER");
-    await callNutritionEngine(
-      {
-        mealPlanPreferences: {
-          caloriasObjetivo: calorieTarget || 1800,
-          dias: ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"],
+    const targetKcal = calorieTarget && calorieTarget > 1000 ? calorieTarget : 1800;
+    // Generación inmediata y determinista sin bloqueos de red (<50ms)
+    const immediatePlan = getMockMealPlanner(targetKcal);
+    const immediateGrocery = getMockGroceryList();
+    setEngineState((prev) => ({
+      ...prev,
+      accion_ejecutada: "MEAL_PLANNER",
+      plan_comidas: immediatePlan.plan_comidas,
+      lista_compras: immediateGrocery.lista_compras,
+    }));
+
+    // Opcionalmente consultar API con timeout controlado
+    try {
+      await callNutritionEngine(
+        {
+          mealPlanPreferences: {
+            caloriasObjetivo: targetKcal,
+            dias: ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"],
+          },
         },
-      },
-      "MEAL_PLANNER"
-    );
+        "MEAL_PLANNER"
+      );
+    } catch (e) {
+      console.warn("Plan nutricional estructurado local aplicado:", e);
+    }
   };
 
   const handleGenerateGroceryListFromPlan = async (plan: PlanComidas) => {
@@ -604,6 +620,7 @@ export default function HomePage() {
           {activeTab === "MEAL_PLANNER" && (
             <MealPlannerTab
               planData={engineState.plan_comidas}
+              groceryData={engineState.lista_compras}
               onGeneratePlan={handleGeneratePlan}
               onGenerateGroceryListFromPlan={handleGenerateGroceryListFromPlan}
               isProcessing={isProcessing}

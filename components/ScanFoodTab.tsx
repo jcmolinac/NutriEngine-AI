@@ -438,9 +438,11 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-[10px] text-stone-500 font-bold">Escala 3D:</span>
             {[
+              { label: "🪙 Moneda 1€", hint: "Moneda 1€ (23.25mm)" },
+              { label: "🪙 Moneda 2€", hint: "Moneda 2€ (25.75mm)" },
+              { label: "💳 Tarjeta", hint: "Tarjeta referencia (85x54mm)" },
               { label: "🍽️ Plato 25cm", hint: "Plato llano 25cm" },
-              { label: "🍴 Tenedor 20cm", hint: "Tenedor 20cm referencia" },
-              { label: "🪙 Moneda 2€", hint: "Moneda 2€ referencia 2.6cm" },
+              { label: "🍴 Tenedor 20cm", hint: "Tenedor 20cm" },
             ].map((m) => (
               <button
                 key={m.label}
