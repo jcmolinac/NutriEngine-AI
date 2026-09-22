@@ -1,5 +1,9 @@
 import { NutriEngineOutput, AccionEjecutada } from "@/types/nutrition";
 import { getGeminiClient } from "./gemini";
+import {
+  calibrarIngredienteConLaboratorio,
+  buscarAlimentoEnBaseDatos,
+} from "./verified-nutrition-db";
 
 export const SYSTEM_PROMPT = `Eres el motor integral de inteligencia artificial para una aplicación de nutrición, conteo calórico y planificación de comidas. Tu trabajo consiste en procesar imágenes de platos, entradas de audio/voz, textos y datos antropométricos para generar respuestas estructuradas en formato JSON.
 
@@ -308,20 +312,55 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
 
     if (Array.isArray(esc.ingredientes)) {
       base.escaneo_comida.ingredientes = esc.ingredientes.map((ing: any) => {
+        const weight = Number(ing.peso_estimado_g) || Number(ing.peso_g) || 0;
+        const ingName = String(ing.alimento || "Ingrediente");
+
+        // Calibración científica con BEDCA (España) / USDA FoodData Central
+        const labMatch = calibrarIngredienteConLaboratorio(ingName, weight);
+
+        if (labMatch) {
+          return {
+            alimento: ingName,
+            peso_estimado_g: weight,
+            peso_g: weight,
+            calorias: labMatch.calorias,
+            proteinas_g: labMatch.proteinas_g,
+            carbohidratos_g: labMatch.carbohidratos_g,
+            grasas_g: labMatch.grasas_g,
+            fibra_g: labMatch.fibra_g,
+            sodio_mg: labMatch.sodio_mg,
+            hierro_mg: labMatch.hierro_mg,
+            fuente_verificada: {
+              base_datos: labMatch.alimento_base.fuente,
+              codigo_referencia: labMatch.alimento_base.codigo_referencia,
+              nombre_oficial: labMatch.alimento_base.nombre_oficial,
+              similitud: labMatch.similitud,
+            },
+          };
+        }
+
+        // Estimación asistida por IA si el alimento no está en el catálogo oficial
         const p_g = Number(ing.proteinas_g) || 0;
         const c_g = Number(ing.carbohidratos_g) || 0;
         const f_g = Number(ing.grasas_g) || 0;
-        const weight = Number(ing.peso_estimado_g) || Number(ing.peso_g) || 0;
-        // Strict ingredient mathematical coherence
         const cal = Math.round(p_g * 4 + c_g * 4 + f_g * 9) || Number(ing.calorias) || 0;
         return {
-          alimento: String(ing.alimento || "Ingrediente"),
+          alimento: ingName,
           peso_estimado_g: weight,
           peso_g: weight,
           calorias: cal,
           proteinas_g: p_g,
           carbohidratos_g: c_g,
           grasas_g: f_g,
+          fibra_g: Number(ing.fibra_g) || 0,
+          sodio_mg: Number(ing.sodio_mg) || 0,
+          hierro_mg: ing.hierro_mg ? Number(ing.hierro_mg) : undefined,
+          fuente_verificada: {
+            base_datos: "AI_ESTIMATED" as const,
+            codigo_referencia: "AI-VIS-01",
+            nombre_oficial: ingName,
+            similitud: 0.95,
+          },
         };
       });
     }
@@ -383,14 +422,25 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
     );
 
     if (!hasOil && isWarmCooked && !isRawOrColdOrExempt && hasNutritiveCalories && base.escaneo_comida.ingredientes.length > 0) {
+      const oilLab = calibrarIngredienteConLaboratorio("aceite de oliva", 8);
       base.escaneo_comida.ingredientes.push({
         alimento: "Aceite de cocción (salteado/plancha/horno)",
         peso_estimado_g: 8,
         peso_g: 8,
-        calorias: 72,
-        proteinas_g: 0,
-        carbohidratos_g: 0,
-        grasas_g: 8,
+        calorias: oilLab?.calorias || 72,
+        proteinas_g: oilLab?.proteinas_g || 0,
+        carbohidratos_g: oilLab?.carbohidratos_g || 0,
+        grasas_g: oilLab?.grasas_g || 8,
+        fibra_g: 0,
+        sodio_mg: 0,
+        fuente_verificada: oilLab
+          ? {
+              base_datos: oilLab.alimento_base.fuente,
+              codigo_referencia: oilLab.alimento_base.codigo_referencia,
+              nombre_oficial: oilLab.alimento_base.nombre_oficial,
+              similitud: oilLab.similitud,
+            }
+          : undefined,
       });
       base.escaneo_comida.control_calidad.grasa_coccion_detectada = true;
     } else if (hasOil) {
@@ -409,11 +459,14 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
       );
     }
 
-    // Regla 3: Coherencia matemática estricta
+    // Regla 3: Coherencia matemática estricta y totales certificados
     // Calorías = (Proteínas × 4) + (Carbohidratos × 4) + (Grasas × 9) y suma porcentual = 100.0%
     let p = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + item.proteinas_g, 0);
     let c = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + item.carbohidratos_g, 0);
     let f = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + item.grasas_g, 0);
+    let fibraTotal = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + (item.fibra_g || 0), 0);
+    let sodioTotal = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + (item.sodio_mg || 0), 0);
+    let hierroTotal = base.escaneo_comida.ingredientes.reduce((sum, item) => sum + (item.hierro_mg || 0), 0);
 
     if (p === 0 && c === 0 && f === 0) {
       p = Number(esc.macronutrientes?.proteinas_g) || 0;
@@ -424,6 +477,9 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
     p = Math.round(p * 10) / 10;
     c = Math.round(c * 10) / 10;
     f = Math.round(f * 10) / 10;
+    fibraTotal = Math.round(fibraTotal * 10) / 10;
+    sodioTotal = Math.round(sodioTotal);
+    hierroTotal = Math.round(hierroTotal * 100) / 100;
 
     const calculatedCalories = Math.round(p * 4 + c * 4 + f * 9);
     base.escaneo_comida.calorias_totales = calculatedCalories;
@@ -446,7 +502,38 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
       porcentaje_proteinas: pPct,
       porcentaje_carbohidratos: cPct,
       porcentaje_grasas: fPct,
+      fibra_total_g: fibraTotal,
+      sodio_total_mg: sodioTotal,
+      hierro_total_mg: hierroTotal > 0 ? hierroTotal : undefined,
     };
+
+    // Asignación de fuente verificada principal
+    const dishMatch = base.escaneo_comida.nombre_plato
+      ? buscarAlimentoEnBaseDatos(base.escaneo_comida.nombre_plato)
+      : null;
+
+    if (dishMatch) {
+      base.escaneo_comida.fuente_verificada_principal = {
+        base_datos: dishMatch.alimento.fuente,
+        codigo_referencia: dishMatch.alimento.codigo_referencia,
+        nombre_oficial: dishMatch.alimento.nombre_oficial,
+        similitud: dishMatch.similitud,
+      };
+    } else {
+      const bestIngredient = base.escaneo_comida.ingredientes.find(
+        (ing) => ing.fuente_verificada && ing.fuente_verificada.base_datos !== "AI_ESTIMATED"
+      );
+      if (bestIngredient?.fuente_verificada) {
+        base.escaneo_comida.fuente_verificada_principal = bestIngredient.fuente_verificada;
+      } else {
+        base.escaneo_comida.fuente_verificada_principal = {
+          base_datos: "AI_ESTIMATED",
+          codigo_referencia: "AI-VIS-01",
+          nombre_oficial: base.escaneo_comida.nombre_plato || "Plato escaneado",
+          similitud: 0.95,
+        };
+      }
+    }
   }
 
   // Registro diario

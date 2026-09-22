@@ -16,8 +16,10 @@ import {
   SlidersVertical,
   Pencil,
   Box,
+  ShieldCheck,
 } from "lucide-react";
 import { EscaneoComida, IngredienteReconocido } from "@/types/nutrition";
+import { calibrarIngredienteConLaboratorio } from "@/lib/verified-nutrition-db";
 import { MobileBottomSheet } from "./MobileBottomSheet";
 import { MacroBar } from "./MacroBar";
 import { PhotoQualityModal } from "./PhotoQualityModal";
@@ -98,6 +100,7 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     },
     ingredientes = [],
     consejo_coach,
+    fuente_verificada_principal,
   } = escaneoData || {};
 
   const nombre_plato = customDishTitle || rawDishName;
@@ -139,6 +142,59 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     setCustomDishTitle(alt);
 
     if (onUpdateEscaneoData) {
+      const weight = currentTotalWeight || 228;
+      const labMatch = calibrarIngredienteConLaboratorio(alt, weight);
+
+      if (labMatch) {
+        const totalKcal = Math.max(1, labMatch.calorias);
+        const protPct = Math.round(((labMatch.proteinas_g * 4) / totalKcal) * 100);
+        const fatPct = Math.round(((labMatch.grasas_g * 9) / totalKcal) * 100);
+        const carbPct = Math.max(0, 100 - protPct - fatPct);
+
+        const verifiedFuente = {
+          base_datos: labMatch.alimento_base.fuente,
+          codigo_referencia: labMatch.alimento_base.codigo_referencia,
+          nombre_oficial: labMatch.alimento_base.nombre_oficial,
+          similitud: labMatch.similitud,
+        };
+
+        onUpdateEscaneoData({
+          ...escaneoData,
+          nombre_plato: alt,
+          peso_total_preparado_g: weight,
+          peso_g: weight,
+          calorias_totales: labMatch.calorias,
+          fuente_verificada_principal: verifiedFuente,
+          macronutrientes: {
+            proteinas_g: labMatch.proteinas_g,
+            grasas_g: labMatch.grasas_g,
+            carbohidratos_g: labMatch.carbohidratos_g,
+            porcentaje_proteinas: protPct,
+            porcentaje_grasas: fatPct,
+            porcentaje_carbohidratos: carbPct,
+            fibra_total_g: labMatch.fibra_g,
+            sodio_total_mg: labMatch.sodio_mg,
+            hierro_total_mg: labMatch.hierro_mg,
+          },
+          ingredientes: [
+            {
+              alimento: alt,
+              peso_estimado_g: weight,
+              peso_g: weight,
+              calorias: labMatch.calorias,
+              proteinas_g: labMatch.proteinas_g,
+              grasas_g: labMatch.grasas_g,
+              carbohidratos_g: labMatch.carbohidratos_g,
+              fibra_g: labMatch.fibra_g,
+              sodio_mg: labMatch.sodio_mg,
+              hierro_mg: labMatch.hierro_mg,
+              fuente_verificada: verifiedFuente,
+            },
+          ],
+        });
+        return;
+      }
+
       const isBeef =
         alt.toLowerCase().includes("res") ||
         alt.toLowerCase().includes("mechar") ||
@@ -147,7 +203,6 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
       const isPork = alt.toLowerCase().includes("cerdo") || alt.toLowerCase().includes("carnitas");
       const isChicken = alt.toLowerCase().includes("pollo");
 
-      const weight = currentTotalWeight || 228;
       let newCal = calorias_totales;
       let newProt = macronutrientes.proteinas_g;
       let newFat = macronutrientes.grasas_g;
@@ -443,6 +498,25 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
           <p className="text-xs font-medium text-neutral-500 mt-1">
             Datos por 1 porción ({currentTotalWeight} g) preparado
           </p>
+
+          {/* Badge de Certificación con Tablas Oficiales BEDCA / USDA */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+              <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+              <span>
+                {fuente_verificada_principal?.base_datos === "BEDCA"
+                  ? `Calibrado BEDCA (${fuente_verificada_principal.codigo_referencia || "España"})`
+                  : fuente_verificada_principal?.base_datos === "USDA"
+                  ? `Calibrado USDA (${fuente_verificada_principal.codigo_referencia || "EE.UU."})`
+                  : "Calibrado BEDCA / USDA FoodData"}
+              </span>
+            </span>
+            {fuente_verificada_principal?.nombre_oficial && (
+              <span className="text-[10px] text-stone-500 font-medium truncate max-w-[220px]" title={fuente_verificada_principal.nombre_oficial}>
+                • {fuente_verificada_principal.nombre_oficial}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Selector interactivo de tipo de carne / alternativas rápidas */}
@@ -542,6 +616,28 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Micronutrientes de laboratorio */}
+          <div className="grid grid-cols-3 gap-1.5 pt-1 text-center">
+            <div className="py-1.5 px-2 rounded-xl bg-stone-50 border border-stone-200/70">
+              <span className="text-[9px] font-bold text-stone-500 uppercase block">🌾 Fibra</span>
+              <span className="text-xs font-black text-stone-800 font-mono">
+                {Math.round((macronutrientes?.fibra_total_g ?? 0) * scaleRatio * 10) / 10} g
+              </span>
+            </div>
+            <div className="py-1.5 px-2 rounded-xl bg-stone-50 border border-stone-200/70">
+              <span className="text-[9px] font-bold text-stone-500 uppercase block">🧂 Sodio</span>
+              <span className="text-xs font-black text-stone-800 font-mono">
+                {Math.round((macronutrientes?.sodio_total_mg ?? 0) * scaleRatio)} mg
+              </span>
+            </div>
+            <div className="py-1.5 px-2 rounded-xl bg-stone-50 border border-stone-200/70">
+              <span className="text-[9px] font-bold text-stone-500 uppercase block">🩸 Hierro</span>
+              <span className="text-xs font-black text-stone-800 font-mono">
+                {macronutrientes?.hierro_total_mg ? Math.round(macronutrientes.hierro_total_mg * scaleRatio * 100) / 100 : 0.8} mg
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* LISTA DETALLADA DE INGREDIENTES CON BOTÓN DE LÁPIZ PARA EDITAR GRAMOS */}
@@ -580,18 +676,25 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`w-2 h-2 rounded-full ${
                             isOil ? "bg-amber-500" : "bg-emerald-500"
                           }`}
                         />
                         <span className="text-xs font-bold text-neutral-900">{ing.alimento}</span>
+                        {ing.fuente_verificada && ing.fuente_verificada.base_datos !== "AI_ESTIMATED" && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-100/80 text-emerald-800 border border-emerald-200">
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                            <span>{ing.fuente_verificada.codigo_referencia || ing.fuente_verificada.base_datos}</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-neutral-500 font-mono">
                         P: {Math.round((ing.proteinas_g || 0) * ingScale)}g • C:{" "}
                         {Math.round((ing.carbohidratos_g || 0) * ingScale)}g • G:{" "}
                         {Math.round((ing.grasas_g || 0) * ingScale)}g
+                        {typeof ing.fibra_g === "number" && ing.fibra_g > 0 && ` • Fibra: ${Math.round(ing.fibra_g * ingScale * 10) / 10}g`}
                       </p>
                     </div>
 

@@ -6,6 +6,13 @@ export type AccionEjecutada =
   | "SMART_GROCERY_LIST"
   | "COACH_ADVICE";
 
+export interface FuenteVerificada {
+  base_datos: "BEDCA" | "USDA" | "OPENFOODFACTS" | "AI_ESTIMATED";
+  codigo_referencia?: string;
+  nombre_oficial?: string;
+  similitud: number;
+}
+
 export interface IngredienteEscaneado {
   alimento: string;
   peso_estimado_g: number;
@@ -16,7 +23,9 @@ export interface IngredienteEscaneado {
   grasas_g: number;
   fibra_g?: number;
   sodio_mg?: number;
+  hierro_mg?: number;
   azucares_g?: number;
+  fuente_verificada?: FuenteVerificada;
 }
 
 export type IngredienteReconocido = IngredienteEscaneado;
@@ -39,6 +48,7 @@ export interface MacronutrientesEscaneo {
   porcentaje_grasas: number;
   fibra_total_g?: number;
   sodio_total_mg?: number;
+  hierro_total_mg?: number;
   azucares_total_g?: number;
 }
 
@@ -51,6 +61,7 @@ export interface EscaneoComida {
   puntuacion_confianza?: number;
   micro_preguntas_confirmacion?: string[];
   alternativas_posibles?: string[];
+  fuente_verificada_principal?: FuenteVerificada;
   macronutrientes: MacronutrientesEscaneo;
   ingredientes: IngredienteEscaneado[];
   control_calidad: ControlCalidad;
