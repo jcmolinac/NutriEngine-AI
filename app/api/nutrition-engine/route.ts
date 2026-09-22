@@ -142,6 +142,10 @@ Acción solicitada o detectada: "${targetAction}"
       instructionText += `Texto o consulta del usuario: "${inputText}"\n`;
     }
 
+    if (audioBase64) {
+      instructionText += `Audio adjunto: Transcribe con máxima precisión lo que el usuario dice haber comido y desglosa CADA alimento individualmente en items_reconocidos con su peso en gramos (peso_g), calorías y macronutrientes. NUNCA devuelvas un registro genérico como "Nota de voz".\n`;
+    }
+
     if (userHint) {
       instructionText += `Pista o nota explícita del usuario sobre el alimento o plato: "${userHint}" (prioriza esta pista para identificar el plato con máxima exactitud)\n`;
     }

@@ -82,9 +82,11 @@ export default function HomePage() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
   const [engineState, setEngineState] = useState<NutriEngineOutput>(createCleanInitialState);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    () => new Date().toISOString().split("T")[0]
-  );
+  const getTodayLocalIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayLocalIso);
 
   const STORAGE_KEY = "nutriengine_pwa_v6_clean";
   const [isHydrated, setIsHydrated] = useState(false);
@@ -420,6 +422,45 @@ export default function HomePage() {
     });
   };
 
+  const handleUpdateDirectItem = (
+    sectionId: "desayuno" | "comida" | "cena",
+    itemIndex: number,
+    updated: any
+  ) => {
+    setEngineState((prev) => {
+      const items = [...(prev.registro_diario?.items_reconocidos || [])];
+      const matchIdx = items.findIndex((it, idx) => {
+        if (updated.id && (it as any).id === updated.id) return true;
+        return it.alimento === updated.nombre || idx === itemIndex;
+      });
+
+      if (matchIdx >= 0) {
+        items[matchIdx] = {
+          ...items[matchIdx],
+          alimento: updated.nombre,
+          peso_g: updated.peso_g,
+          porcion_estimada: `${updated.peso_g} g`,
+          calorias: updated.calorias,
+          proteinas_g: updated.proteinas_g,
+          carbohidratos_g: updated.carbohidratos_g,
+          grasas_g: updated.grasas_g,
+          fibra_g: updated.fibra_g,
+          sodio_mg: updated.sodio_mg,
+          fuente_verificada: updated.fuente_verificada,
+        };
+      }
+      const totalCal = items.reduce((acc, it) => acc + (it.calorias || 0), 0);
+      return {
+        ...prev,
+        registro_diario: {
+          ...prev.registro_diario,
+          items_reconocidos: items,
+          total_calorias: totalCal,
+        },
+      };
+    });
+  };
+
   const handleCalculateTargets = async (userData: UserAntropoData) => {
     setActiveTab("CALCULATE_TARGETS_AND_TIMELINE");
     // Cálculo optimista inmediato para respuesta instantánea de UI
@@ -544,6 +585,7 @@ export default function HomePage() {
               onSelectDate={setSelectedDate}
               onAddDirectItem={handleAddDirectItem}
               onDeleteDirectItem={handleDeleteDirectItem}
+              onUpdateDirectItem={handleUpdateDirectItem}
               onLogTextOrVoice={handleLogTextOrVoice}
               isProcessing={isProcessing}
             />

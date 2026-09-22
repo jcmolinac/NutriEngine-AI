@@ -20,6 +20,15 @@ export const CalendarDateStrip: React.FC<CalendarDateStripProps> = ({
   onSelectDate,
   dayRecords = {},
 }) => {
+  const formatLocalIso = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayIso = React.useMemo(() => formatLocalIso(new Date()), []);
+
   // Generar los últimos 8 días terminando en hoy
   const days = React.useMemo(() => {
     const list = [];
@@ -27,7 +36,7 @@ export const CalendarDateStrip: React.FC<CalendarDateStripProps> = ({
     for (let i = 7; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const iso = d.toISOString().split("T")[0];
+      const iso = formatLocalIso(d);
       const dayName = d.toLocaleDateString("es-ES", { weekday: "short" });
       const dayNum = d.getDate();
       const isToday = i === 0;
@@ -74,9 +83,26 @@ export const CalendarDateStrip: React.FC<CalendarDateStripProps> = ({
           <span>Calendario de Hábitos</span>
         </div>
 
-        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100/70 text-amber-900 text-[11px] font-black">
-          <Flame className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-          <span>Racha: {streakCount} {streakCount === 1 ? "día" : "días"}</span>
+        <div className="flex items-center gap-2">
+          {selectedDate !== todayIso && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined" && "vibrate" in navigator) {
+                  navigator.vibrate?.(20);
+                }
+                onSelectDate(todayIso);
+              }}
+              className="px-2 py-0.5 rounded-full bg-fitia-yellow text-fitia-dark text-[10px] font-black shadow-2xs active:scale-95 transition"
+            >
+              📍 Ir a Hoy
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100/70 text-amber-900 text-[11px] font-black">
+            <Flame className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+            <span>Racha: {streakCount} {streakCount === 1 ? "día" : "días"}</span>
+          </div>
         </div>
       </div>
 

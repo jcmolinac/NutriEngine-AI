@@ -17,6 +17,7 @@ import {
   Pencil,
   Box,
   ShieldCheck,
+  Mic,
 } from "lucide-react";
 import { EscaneoComida, IngredienteReconocido } from "@/types/nutrition";
 import { calibrarIngredienteConLaboratorio } from "@/lib/verified-nutrition-db";
@@ -55,6 +56,57 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
   const [editingIngredientIdx, setEditingIngredientIdx] = useState<number | null>(null);
   const [customWeightsOverride, setCustomWeightsOverride] = useState<Record<number, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isHintRecording, setIsHintRecording] = useState(false);
+  const hintSpeechRecRef = useRef<any>(null);
+
+  const toggleHintVoice = () => {
+    if (isHintRecording) {
+      if (hintSpeechRecRef.current) {
+        try {
+          hintSpeechRecRef.current.stop();
+        } catch (e) {}
+        hintSpeechRecRef.current = null;
+      }
+      setIsHintRecording(false);
+      return;
+    }
+
+    const SpeechRec =
+      typeof window !== "undefined" &&
+      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (!SpeechRec) {
+      alert("El dictado por voz no está soportado en este navegador.");
+      return;
+    }
+
+    try {
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate?.(25);
+      }
+      const rec = new SpeechRec();
+      rec.lang = "es-ES";
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.onresult = (evt: any) => {
+        let transcript = "";
+        for (let i = 0; i < evt.results.length; i++) {
+          transcript += evt.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setUserHint(transcript.trim());
+        }
+      };
+      rec.onend = () => setIsHintRecording(false);
+      rec.onerror = () => setIsHintRecording(false);
+      rec.start();
+      hintSpeechRecRef.current = rec;
+      setIsHintRecording(true);
+    } catch (e) {
+      console.warn("No se pudo iniciar dictado:", e);
+      setIsHintRecording(false);
+    }
+  };
 
   const displayImage = externalCapturedImage || previewImage;
 
@@ -337,25 +389,71 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
           )}
         </div>
 
-        {/* Campo opcional de pista rápida para máxima precisión */}
-        <div className="relative">
-          <input
-            type="text"
-            value={userHint}
-            onChange={(e) => setUserHint(e.target.value)}
-            placeholder="💡 Pista opcional: ej. carne de mechar, sin azúcar..."
-            disabled={isProcessing}
-            className="w-full h-10 px-3.5 text-xs font-semibold rounded-2xl border border-stone-200 bg-white placeholder:text-stone-400 text-stone-900 focus:outline-none focus:border-fitia-yellow transition shadow-2xs"
-          />
-          {userHint && (
-            <button
-              type="button"
-              onClick={() => setUserHint("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-[10px] hover:bg-stone-200"
-            >
-              ✕
-            </button>
-          )}
+        {/* Campo opcional de pista rápida o dictado por voz para máxima precisión */}
+        <div className="space-y-1.5">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={userHint}
+              onChange={(e) => setUserHint(e.target.value)}
+              placeholder={
+                isHintRecording
+                  ? "🎙️ Escuchando... di el plato o gramos"
+                  : "💡 Pista o dictado: ej. carne de mechar 200g..."
+              }
+              disabled={isProcessing}
+              className={`w-full h-10 pl-3.5 pr-16 text-xs font-semibold rounded-2xl border bg-white text-stone-900 focus:outline-none transition shadow-2xs ${
+                isHintRecording
+                  ? "border-rose-500 ring-2 ring-rose-100 bg-rose-50/20"
+                  : "border-stone-200 focus:border-fitia-yellow placeholder:text-stone-400"
+              }`}
+            />
+            <div className="absolute right-2 flex items-center gap-1">
+              {userHint && !isHintRecording && (
+                <button
+                  type="button"
+                  onClick={() => setUserHint("")}
+                  className="w-5 h-5 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-[10px] hover:bg-stone-200"
+                >
+                  ✕
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={toggleHintVoice}
+                aria-label="Dictar pista por voz"
+                title="Dictar pista o peso por voz"
+                className={`w-7 h-7 rounded-xl flex items-center justify-center transition active:scale-95 ${
+                  isHintRecording
+                    ? "bg-rose-600 text-white animate-pulse"
+                    : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Píldoras de escala métrica para calibración de volumen */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[10px] text-stone-500 font-bold">Escala 3D:</span>
+            {[
+              { label: "🍽️ Plato 25cm", hint: "Plato llano 25cm" },
+              { label: "🍴 Tenedor 20cm", hint: "Tenedor 20cm referencia" },
+              { label: "🪙 Moneda 2€", hint: "Moneda 2€ referencia 2.6cm" },
+            ].map((m) => (
+              <button
+                key={m.label}
+                type="button"
+                onClick={() => {
+                  setUserHint((prev) => (prev ? `${prev} (${m.hint})` : m.hint));
+                }}
+                className="px-2 py-0.5 rounded-lg bg-white border border-stone-200/90 hover:bg-stone-50 text-[10px] text-stone-700 font-semibold active:scale-95 transition"
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Action Triggers */}

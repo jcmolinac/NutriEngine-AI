@@ -69,6 +69,7 @@ export interface EscaneoComida {
 }
 
 export interface ItemDiario {
+  id?: string;
   alimento: string;
   porcion_estimada: string;
   peso_g?: number;
@@ -79,6 +80,8 @@ export interface ItemDiario {
   fibra_g?: number;
   sodio_mg?: number;
   azucares_g?: number;
+  tiempo_comida?: TiempoComida;
+  fuente_verificada?: FuenteVerificada;
 }
 
 export type TiempoComida = "Desayuno" | "Comida" | "Cena" | "Snack" | null;

@@ -1,5 +1,6 @@
 import { NutriEngineOutput, UserAntropoData } from "@/types/nutrition";
 import { getEmptyNutriOutput } from "./nutrition-engine-service";
+import { calibrarIngredienteConLaboratorio } from "./verified-nutrition-db";
 
 export function getMockScanFood(): NutriEngineOutput {
   const out = getEmptyNutriOutput("SCAN_FOOD");
@@ -51,117 +52,165 @@ export function getMockLogDiary(texto?: string): NutriEngineOutput {
   else if (lower.includes("cen")) tiempoComida = "Cena";
   else if (lower.includes("snack") || lower.includes("meriend")) tiempoComida = "Snack";
 
+  // Helper para extraer los gramos especificados por el usuario cerca de una palabra clave
+  const extractGramsFor = (keywords: string[], defaultWeight: number): number => {
+    for (const kw of keywords) {
+      // Caso 1: "200 gramos de carne" o "200g carne"
+      const r1 = new RegExp(`(\\d{1,4})\\s*(?:g|gr|gramos)?\\s*(?:de\\s+)?${kw}`, "i");
+      const m1 = lower.match(r1);
+      if (m1) return Math.min(1500, Math.max(10, Number(m1[1])));
+
+      // Caso 2: "carne 200g" o "carne 200 gramos"
+      const r2 = new RegExp(`${kw}\\s*(?:de\\s+)?(\\d{1,4})\\s*(?:g|gr|gramos)?`, "i");
+      const m2 = lower.match(r2);
+      if (m2) return Math.min(1500, Math.max(10, Number(m2[1])));
+    }
+    return defaultWeight;
+  };
+
   const recognizedItems: Array<{
     alimento: string;
     porcion_estimada: string;
+    peso_g: number;
     calorias: number;
     proteinas_g: number;
     carbohidratos_g: number;
     grasas_g: number;
+    fibra_g?: number;
+    sodio_mg?: number;
+    fuente_verificada?: any;
   }> = [];
 
-  // Parsear alimentos reales según lo introducido por el usuario
-  if (lower.includes("huevo")) {
-    recognizedItems.push({
-      alimento: "Huevos enteros a la plancha o revueltos",
-      porcion_estimada: "2 unidades (110 g)",
-      calorias: 180,
-      proteinas_g: 13,
-      carbohidratos_g: 1.5,
-      grasas_g: 13.5,
-    });
-  }
-  if (lower.includes("pollo") || lower.includes("pechuga")) {
-    recognizedItems.push({
-      alimento: "Pechuga de pollo a la plancha",
-      porcion_estimada: "1 filete mediano (150 g)",
-      calorias: 248,
-      proteinas_g: 46,
-      carbohidratos_g: 0,
-      grasas_g: 5.5,
-    });
-  }
-  if (lower.includes("arroz")) {
-    recognizedItems.push({
-      alimento: "Arroz blanco o jazmín cocido",
-      porcion_estimada: "1 taza pequeña (140 g)",
-      calorias: 182,
-      proteinas_g: 3.8,
-      carbohidratos_g: 40,
-      grasas_g: 0.8,
-    });
-  }
-  if (lower.includes("ensalada") || lower.includes("lechuga")) {
-    recognizedItems.push({
-      alimento: "Ensalada verde fresca variada",
-      porcion_estimada: "1 bol mediano (120 g)",
-      calorias: 85,
-      proteinas_g: 1.5,
-      carbohidratos_g: 4,
-      grasas_g: 7,
-    });
-  }
-  if (lower.includes("pan") || lower.includes("tostada")) {
-    recognizedItems.push({
-      alimento: "Tostada de pan integral",
-      porcion_estimada: "1 rebanada (40 g)",
-      calorias: 105,
-      proteinas_g: 3.8,
-      carbohidratos_g: 19,
-      grasas_g: 1.2,
-    });
-  }
-  if (lower.includes("aguacate")) {
-    recognizedItems.push({
-      alimento: "Aguacate Hass fresco",
-      porcion_estimada: "1/2 unidad (60 g)",
-      calorias: 96,
-      proteinas_g: 1.2,
-      carbohidratos_g: 5,
-      grasas_g: 8.8,
-    });
-  }
-  if (lower.includes("cafe") || lower.includes("café")) {
-    recognizedItems.push({
-      alimento: "Café con leche ligera",
-      porcion_estimada: "1 taza (180 ml)",
-      calorias: 48,
-      proteinas_g: 2.2,
-      carbohidratos_g: 5.8,
-      grasas_g: 1.5,
-    });
-  }
-  if (lower.includes("fruta") || lower.includes("manzana") || lower.includes("platano") || lower.includes("plátano")) {
-    recognizedItems.push({
-      alimento: "Fruta fresca de temporada",
-      porcion_estimada: "1 pieza (140 g)",
-      calorias: 78,
-      proteinas_g: 0.6,
-      carbohidratos_g: 19,
-      grasas_g: 0.3,
-    });
-  }
-  if (lower.includes("yogur")) {
-    recognizedItems.push({
-      alimento: "Yogur natural",
-      porcion_estimada: "1 vaso (125 g)",
-      calorias: 85,
-      proteinas_g: 5,
-      carbohidratos_g: 6,
-      grasas_g: 4,
-    });
-  }
+  const addCalibratedItem = (nombreBase: string, peso: number, defaultDesc: string) => {
+    const lab = calibrarIngredienteConLaboratorio(nombreBase, peso);
+    if (lab) {
+      recognizedItems.push({
+        alimento: lab.alimento_base.nombre_oficial,
+        porcion_estimada: `${peso} g`,
+        peso_g: peso,
+        calorias: lab.calorias,
+        proteinas_g: lab.proteinas_g,
+        carbohidratos_g: lab.carbohidratos_g,
+        grasas_g: lab.grasas_g,
+        fibra_g: lab.fibra_g,
+        sodio_mg: lab.sodio_mg,
+        fuente_verificada: {
+          base_datos: lab.alimento_base.fuente,
+          codigo_referencia: lab.alimento_base.codigo_referencia,
+          nombre_oficial: lab.alimento_base.nombre_oficial,
+          similitud: lab.similitud,
+        },
+      });
+    } else {
+      recognizedItems.push({
+        alimento: defaultDesc,
+        porcion_estimada: `${peso} g`,
+        peso_g: peso,
+        calorias: Math.round(peso * 1.5),
+        proteinas_g: Math.round(peso * 0.1),
+        carbohidratos_g: Math.round(peso * 0.15),
+        grasas_g: Math.round(peso * 0.05),
+      });
+    }
+  };
 
-  // Si no coincide con ninguna palabra clave, crear registro personalizado del texto
-  if (recognizedItems.length === 0) {
-    recognizedItems.push({
-      alimento: trimmed.charAt(0).toUpperCase() + trimmed.slice(1),
-      porcion_estimada: "1 porción estimada (180 g)",
-      calorias: 320,
-      proteinas_g: 18,
-      carbohidratos_g: 28,
-      grasas_g: 14,
-    });
+  // Si la entrada es un placeholder genérico de nota de voz, devolver plato compuesto real
+  if (lower.includes("nota de voz") || lower === "grabada por el usuario") {
+    addCalibratedItem("carne de mechar", 200, "Carne de mechar (Res/Ternera)");
+    addCalibratedItem("arroz blanco", 50, "Arroz blanco cocido");
+    addCalibratedItem("ensalada", 100, "Ensalada verde fresca");
+  } else {
+    // Parsear alimentos reales según lo introducido por el usuario
+    if (
+      lower.includes("carne") ||
+      lower.includes("mechar") ||
+      lower.includes("mechada") ||
+      lower.includes("res") ||
+      lower.includes("ternera") ||
+      lower.includes("falda")
+    ) {
+      const g = extractGramsFor(["carne de mechar", "carne", "res", "ternera", "falda"], 200);
+      addCalibratedItem("carne de mechar", g, "Carne de mechar (Res/Ternera)");
+    }
+
+    if (lower.includes("pollo") || lower.includes("pechuga")) {
+      const g = extractGramsFor(["pollo", "pechuga"], 150);
+      addCalibratedItem("pechuga de pollo", g, "Pechuga de pollo a la plancha");
+    }
+
+    if (lower.includes("arroz")) {
+      const g = extractGramsFor(["arroz"], 50);
+      addCalibratedItem("arroz blanco", g, "Arroz blanco cocido");
+    }
+
+    if (lower.includes("ensalada") || lower.includes("lechuga")) {
+      const g = extractGramsFor(["ensalada", "lechuga"], 100);
+      addCalibratedItem("ensalada", g, "Ensalada verde variada");
+    }
+
+    if (lower.includes("huevo")) {
+      const g = extractGramsFor(["huevo", "huevos"], 110);
+      addCalibratedItem("huevo", g, "Huevos enteros a la plancha o revueltos");
+    }
+
+    if (lower.includes("pan") || lower.includes("tostada")) {
+      const g = extractGramsFor(["pan", "tostada"], 40);
+      addCalibratedItem("pan", g, "Pan integral / Tostada");
+    }
+
+    if (lower.includes("aguacate")) {
+      const g = extractGramsFor(["aguacate"], 60);
+      addCalibratedItem("aguacate", g, "Aguacate Hass fresco");
+    }
+
+    if (lower.includes("patata") || lower.includes("papa")) {
+      const g = extractGramsFor(["patata", "papa"], 150);
+      addCalibratedItem("patata", g, "Patata cocida / asada");
+    }
+
+    if (lower.includes("pasta") || lower.includes("espagueti") || lower.includes("macarron")) {
+      const g = extractGramsFor(["pasta", "espagueti", "macarron"], 150);
+      addCalibratedItem("pasta", g, "Pasta cocida");
+    }
+
+    if (lower.includes("atun") || lower.includes("atún") || lower.includes("salmon") || lower.includes("salmón")) {
+      const g = extractGramsFor(["atun", "atún", "salmon", "salmón"], 140);
+      addCalibratedItem(lower.includes("salmon") || lower.includes("salmón") ? "salmon" : "atun", g, "Pescado a la plancha");
+    }
+
+    if (lower.includes("cafe") || lower.includes("café")) {
+      addCalibratedItem("cafe", 180, "Café solo / con leche");
+    }
+
+    if (lower.includes("fruta") || lower.includes("manzana") || lower.includes("platano") || lower.includes("plátano")) {
+      const g = extractGramsFor(["fruta", "manzana", "platano", "plátano"], 140);
+      addCalibratedItem("fruta", g, "Fruta fresca de temporada");
+    }
+
+    if (lower.includes("yogur")) {
+      const g = extractGramsFor(["yogur"], 125);
+      addCalibratedItem("yogur", g, "Yogur natural");
+    }
+
+    // Si no coincidió con ninguna palabra clave, separar por comas o "y"
+    if (recognizedItems.length === 0) {
+      const segments = trimmed
+        .split(/(?:,|\sy\s|\se\s|\splús\s)/i)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 2);
+
+      if (segments.length > 1) {
+        for (const seg of segments) {
+          const m = seg.match(/(\d{1,4})\s*(?:g|gramos)?/i);
+          const w = m ? Number(m[1]) : 100;
+          addCalibratedItem(seg, w, seg);
+        }
+      } else {
+        const m = trimmed.match(/(\d{1,4})\s*(?:g|gramos)?/i);
+        const w = m ? Number(m[1]) : 150;
+        addCalibratedItem(trimmed, w, trimmed.charAt(0).toUpperCase() + trimmed.slice(1));
+      }
+    }
   }
 
   const totalCal = recognizedItems.reduce((acc, it) => acc + it.calorias, 0);

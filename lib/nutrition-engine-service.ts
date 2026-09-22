@@ -34,9 +34,17 @@ ACCIONES DEL SISTEMA:
    - Coherencia matemática estricta: Totaliza el peso en gramos preparados, verifica que Calorías = (Proteínas × 4) + (Carbohidratos × 4) + (Grasas × 9) y que la suma de porcentajes dé exactamente 100% (o 0% si las calorías son 0).
    - Consejo del Coach: Incluye un análisis breve y motivador del alimento o bebida identificada.
 
-2. ACCIÓN: "LOG_DIARY_TEXT_OR_VOICE" (Cuando el usuario escribe o dicta lo que comió)
-   - Transforma entradas informales (ej. "me comí dos huevos revueltos con una rebanada de pan y un café con leche") en un registro estructurado asignado al tiempo de comida correspondiente (Desayuno, Comida, Cena o Snack).
-   - Realiza estimaciones realistas de porciones estándar si el usuario no especifica pesos.
+2. ACCIÓN: "LOG_DIARY_TEXT_OR_VOICE" (Cuando el usuario escribe o dicta por voz lo que comió)
+   - Transcribe con máxima fidelidad las entradas de texto o notas de voz (ej. "comí 200 gramos de carne, 50 gramos de arroz y 100 gramos de ensalada").
+   - DESGLOSE OBLIGATORIO DE CADA ALIMENTO: NUNCA crees un solo registro genérico como "Nota de voz" o "Comida". Desglosa CADA alimento mencionado por separado en el array "items_reconocidos".
+   - EXTRACCIÓN Y ESTIMACIÓN DE GRAMOS EXACTOS: Si el usuario indica pesos específicos (ej. "200 gramos de carne", "50 de arroz", "100 de ensalada"), asigna EXACTAMENTE esos gramos a cada item en el campo peso_g (ej. carne 200g, arroz 50g, ensalada 100g). Si no indica pesos, asigna porciones estándar realistas (ej. 150g pechuga, 140g arroz, 120g ensalada) pero jamás dejes 100g idéntico a todo.
+   - Para cada elemento de items_reconocidos:
+     * alimento: Nombre descriptivo específico (ej. "Carne de res cocida / mechar", "Arroz blanco cocido", "Ensalada verde variada")
+     * porcion_estimada: string descriptivo (ej. "200 g", "50 g", "100 g")
+     * peso_g: número en gramos exactos
+     * calorias: calorías proporcionales al peso
+     * proteinas_g, carbohidratos_g, grasas_g, fibra_g, sodio_mg
+   - Coherencia: "total_calorias" debe ser la suma exacta de las calorías de cada item individual.
 
 3. ACCIÓN: "CALCULATE_TARGETS_AND_TIMELINE" (Cuando recibes datos del usuario: edad, peso, altura, género, actividad y peso meta)
    - Calcula Tasa Metabólica Basal (BMR) y Gasto Energético Total Diario (TDEE).
@@ -543,20 +551,59 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
     base.registro_diario.descripcion_original = reg.descripcion_original || null;
     base.registro_diario.total_calorias = Number(reg.total_calorias) || 0;
     if (Array.isArray(reg.items_reconocidos)) {
-      base.registro_diario.items_reconocidos = reg.items_reconocidos.map((it: any) => ({
-        alimento: String(it.alimento || "Item"),
-        porcion_estimada: String(it.porcion_estimada || "1 porción"),
-        calorias: Number(it.calorias) || 0,
-        proteinas_g: Number(it.proteinas_g) || 0,
-        carbohidratos_g: Number(it.carbohidratos_g) || 0,
-        grasas_g: Number(it.grasas_g) || 0,
-      }));
-      if (base.registro_diario.total_calorias === 0) {
-        base.registro_diario.total_calorias = base.registro_diario.items_reconocidos.reduce(
-          (sum, item) => sum + item.calorias,
-          0
-        );
-      }
+      base.registro_diario.items_reconocidos = reg.items_reconocidos.map((it: any) => {
+        const name = String(it.alimento || "Alimento");
+        let weight = Number(it.peso_g);
+        if (!weight || isNaN(weight) || weight <= 0) {
+          const match = (String(it.porcion_estimada || "") + " " + name).match(/(\d+)\s*(?:g|gramos)/i);
+          weight = match ? Number(match[1]) : 120;
+        }
+
+        const labMatch = calibrarIngredienteConLaboratorio(name, weight);
+        if (labMatch) {
+          return {
+            alimento: name,
+            porcion_estimada: it.porcion_estimada || `${weight} g`,
+            peso_g: weight,
+            calorias: labMatch.calorias,
+            proteinas_g: labMatch.proteinas_g,
+            carbohidratos_g: labMatch.carbohidratos_g,
+            grasas_g: labMatch.grasas_g,
+            fibra_g: labMatch.fibra_g,
+            sodio_mg: labMatch.sodio_mg,
+            tiempo_comida: it.tiempo_comida || reg.tiempo_comida || null,
+            fuente_verificada: {
+              base_datos: labMatch.alimento_base.fuente,
+              codigo_referencia: labMatch.alimento_base.codigo_referencia,
+              nombre_oficial: labMatch.alimento_base.nombre_oficial,
+              similitud: labMatch.similitud,
+            },
+          };
+        }
+
+        const p = Number(it.proteinas_g) || 0;
+        const c = Number(it.carbohidratos_g) || 0;
+        const f = Number(it.grasas_g) || 0;
+        const cal = Math.round(p * 4 + c * 4 + f * 9) || Number(it.calorias) || 0;
+
+        return {
+          alimento: name,
+          porcion_estimada: it.porcion_estimada || `${weight} g`,
+          peso_g: weight,
+          calorias: cal,
+          proteinas_g: p,
+          carbohidratos_g: c,
+          grasas_g: f,
+          fibra_g: Number(it.fibra_g) || 0,
+          sodio_mg: Number(it.sodio_mg) || 0,
+          tiempo_comida: it.tiempo_comida || reg.tiempo_comida || null,
+        };
+      });
+
+      base.registro_diario.total_calorias = base.registro_diario.items_reconocidos.reduce(
+        (sum, item) => sum + item.calorias,
+        0
+      );
     }
   }
 
