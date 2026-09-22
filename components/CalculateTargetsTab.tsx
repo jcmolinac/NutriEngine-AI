@@ -17,13 +17,17 @@ import { AdaptiveBudgetModal } from "./AdaptiveBudgetModal";
 
 interface CalculateTargetsTabProps {
   metasData: MetasYProgreso;
+  perfilUsuario?: UserAntropoData | null;
   onCalculateTargets: (userData: UserAntropoData) => Promise<void>;
+  onResetTargets?: () => void;
   isProcessing: boolean;
 }
 
 export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
   metasData,
+  perfilUsuario,
   onCalculateTargets,
+  onResetTargets,
   isProcessing,
 }) => {
   const [formData, setFormData] = useState<{
@@ -33,14 +37,29 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
     altura_cm: number | "";
     nivel_actividad: "sedentario" | "ligero" | "moderado" | "intenso";
     peso_meta_kg: number | "";
-  }>({
-    edad: "",
-    genero: "masculino",
-    peso_actual_kg: "",
-    altura_cm: "",
-    nivel_actividad: "sedentario",
-    peso_meta_kg: "",
-  });
+  }>(() => ({
+    edad: perfilUsuario?.edad ?? "",
+    genero: perfilUsuario?.genero ?? "masculino",
+    peso_actual_kg: perfilUsuario?.peso_actual_kg ?? "",
+    altura_cm: perfilUsuario?.altura_cm ?? "",
+    nivel_actividad: perfilUsuario?.nivel_actividad ?? "sedentario",
+    peso_meta_kg: perfilUsuario?.peso_meta_kg ?? "",
+  }));
+
+  const [prevPerfil, setPrevPerfil] = useState(perfilUsuario);
+  if (perfilUsuario !== prevPerfil) {
+    setPrevPerfil(perfilUsuario);
+    if (perfilUsuario) {
+      setFormData({
+        edad: perfilUsuario.edad ?? "",
+        genero: perfilUsuario.genero ?? "masculino",
+        peso_actual_kg: perfilUsuario.peso_actual_kg ?? "",
+        altura_cm: perfilUsuario.altura_cm ?? "",
+        nivel_actividad: perfilUsuario.nivel_actividad ?? "sedentario",
+        peso_meta_kg: perfilUsuario.peso_meta_kg ?? "",
+      });
+    }
+  }
 
   const [showTimelineSheet, setShowTimelineSheet] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -82,7 +101,9 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
     gasto_energetico_total_tdee = 0,
   } = metasData || {};
 
-  const hasCalculated = calorias_diarias_recomendadas > 0;
+  const hasUserFormFilled =
+    formData.edad !== "" && formData.peso_actual_kg !== "" && formData.altura_cm !== "";
+  const hasCalculated = calorias_diarias_recomendadas > 0 && hasUserFormFilled;
 
   const displayBmr = tasa_metabolica_basal_bmr || Math.round(calorias_diarias_recomendadas * 0.83);
   const displayTdee = gasto_energetico_total_tdee || Math.round(calorias_diarias_recomendadas * 1.25);
@@ -136,9 +157,31 @@ export const CalculateTargetsTab: React.FC<CalculateTargetsTabProps> = ({
               Datos Antropométricos
             </h3>
           </div>
-          <span className="px-2 py-0.5 rounded-full bg-fitia-surface text-stone-700 text-[10px] font-bold border border-stone-200">
-            Harris-Benedict
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded-full bg-fitia-surface text-stone-700 text-[10px] font-bold border border-stone-200">
+              Harris-Benedict
+            </span>
+            {hasCalculated && onResetTargets && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData({
+                    edad: "",
+                    genero: "masculino",
+                    peso_actual_kg: "",
+                    altura_cm: "",
+                    nivel_actividad: "sedentario",
+                    peso_meta_kg: "",
+                  });
+                  onResetTargets();
+                }}
+                className="px-2 py-0.5 rounded-full bg-stone-100 hover:bg-rose-50 hover:text-rose-600 text-stone-500 text-[10px] font-bold border border-stone-200 transition active:scale-95"
+                title="Limpiar datos y empezar de cero"
+              >
+                Limpiar ✕
+              </button>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">

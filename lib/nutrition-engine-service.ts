@@ -22,6 +22,10 @@ ACCIONES DEL SISTEMA:
      c) Productos envasados, snacks o artículos con código de barras: Lee el nombre de la marca, el producto y la información nutricional de la etiqueta visible. Si se aprecian los números del código de barras (ej. EAN-13), utilízalos para máxima precisión.
      d) Alimentos crudos y frutas: Calcula según peso estimado sin aceites añadidos (método "natural" o "crudo").
      e) Objetos no comestibles (personas, llaves, celulares, mesas vacías, fondos): Responde con nombre_plato: "Alimento no detectado", calorias_totales: 0, puntuacion_confianza: 0.0, control_calidad.alimento_dentro_del_marco: false, y un consejo_coach que invite amablemente a enfocar comida o bebida.
+     f) Carnes deshebradas, mechadas o deshilachadas (Carne de mechar / carne mechada de res, falda, ropa vieja vs pollo deshebrado vs cerdo mechado):
+         - Si el usuario incluye una pista o nota (ej. "carne de mechar", "carne mechada", "res", "falda"), clasifica prioritariamente como "Carne de mechar (Res/Ternera)".
+         - La carne de mechar (res/ternera) aporta aprox. 210-235 kcal por 100g preparada (~28-32g proteínas, ~8-12g grasas).
+         - Si no hay pista textual, evalúa fibras y grosor. Para toda carne o plato deshebrado, incluye siempre en "alternativas_posibles": ["Carne de mechar (Res/Ternera)", "Pollo deshebrado sazonado", "Cerdo deshebrado / Carnitas"] para permitir conmutación con 1 toque.
    - Calidad de toma: Evalúa si el alimento está dentro del marco (alimento_dentro_del_marco: true/false) y si los componentes son visibles (ingredientes_visibles: true/false).
    - Coherencia matemática estricta: Totaliza el peso en gramos preparados, verifica que Calorías = (Proteínas × 4) + (Carbohidratos × 4) + (Grasas × 9) y que la suma de porcentajes dé exactamente 100% (o 0% si las calorías son 0).
    - Consejo del Coach: Incluye un análisis breve y motivador del alimento o bebida identificada.
@@ -63,6 +67,9 @@ Responde ÚNICA Y EXCLUSIVAMENTE con el siguiente objeto JSON válido, sin bloqu
     "puntuacion_confianza": 0.95,
     "micro_preguntas_confirmacion": [
       "string (ej. ¿Se utilizó aceite de oliva al cocinar el pollo?)"
+    ],
+    "alternativas_posibles": [
+      "string (ej. Carne de mechar (Res/Ternera), Pollo deshebrado, Cerdo mechado)"
     ],
     "macronutrientes": {
       "proteinas_g": 0.0,
@@ -176,6 +183,7 @@ export function getEmptyNutriOutput(accion: AccionEjecutada): NutriEngineOutput 
       metodo_coccion_inferido: "natural",
       puntuacion_confianza: 0.95,
       micro_preguntas_confirmacion: [],
+      alternativas_posibles: [],
       macronutrientes: {
         proteinas_g: 0,
         carbohidratos_g: 0,
@@ -258,6 +266,31 @@ export function sanitizeAndNormalizeOutput(raw: any, fallbackAccion?: AccionEjec
         "¿El peso total de la ración se ajusta a lo que ves en tu plato?",
         "¿Se añadió sal, pan o salsa acompañante?",
       ];
+    }
+
+    // alternativas_posibles
+    if (Array.isArray(esc.alternativas_posibles) && esc.alternativas_posibles.length > 0) {
+      base.escaneo_comida.alternativas_posibles = esc.alternativas_posibles.map((a: any) =>
+        typeof a === "object" && a?.tipo ? String(a.tipo) : String(a)
+      );
+    } else {
+      const dishLower = (base.escaneo_comida.nombre_plato || "").toLowerCase();
+      if (
+        dishLower.includes("deshebrad") ||
+        dishLower.includes("mechada") ||
+        dishLower.includes("mechar") ||
+        dishLower.includes("deshilachad") ||
+        dishLower.includes("pulled") ||
+        dishLower.includes("ropa vieja")
+      ) {
+        base.escaneo_comida.alternativas_posibles = [
+          "Carne de mechar (Res/Ternera)",
+          "Pollo deshebrado sazonado",
+          "Cerdo deshebrado / Carnitas",
+        ];
+      } else {
+        base.escaneo_comida.alternativas_posibles = [];
+      }
     }
 
     if (esc.control_calidad) {

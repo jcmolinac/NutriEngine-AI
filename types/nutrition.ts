@@ -50,6 +50,7 @@ export interface EscaneoComida {
   metodo_coccion_inferido?: string;
   puntuacion_confianza?: number;
   micro_preguntas_confirmacion?: string[];
+  alternativas_posibles?: string[];
   macronutrientes: MacronutrientesEscaneo;
   ingredientes: IngredienteEscaneado[];
   control_calidad: ControlCalidad;
@@ -198,6 +199,7 @@ export interface NutriEngineOutput {
   escaneo_comida: EscaneoComida;
   registro_diario: RegistroDiario;
   metas_y_progreso: MetasYProgreso;
+  perfil_usuario?: UserAntropoData | null;
   plan_comidas: PlanComidas;
   lista_compras: CategoriaCompra[];
   modulo_coach: ModuloCoach;

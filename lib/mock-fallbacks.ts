@@ -178,12 +178,15 @@ export function getMockLogDiary(texto?: string): NutriEngineOutput {
 
 export function getMockCalculateTargets(user?: Partial<UserAntropoData>): NutriEngineOutput {
   const out = getEmptyNutriOutput("CALCULATE_TARGETS_AND_TIMELINE");
-  const edad = Number(user?.edad) || 42;
-  const genero = user?.genero || "masculino";
-  const pesoActual = Number(user?.peso_actual_kg) || 95;
-  const altura = Number(user?.altura_cm) || 183;
-  const pesoMeta = Number(user?.peso_meta_kg) || 82;
-  const nivel = (user?.nivel_actividad || "sedentario").toLowerCase();
+  if (!user || (!user.edad && !user.peso_actual_kg)) {
+    return out;
+  }
+  const edad = Number(user.edad) || 30;
+  const genero = user.genero || "masculino";
+  const pesoActual = Number(user.peso_actual_kg) || 75;
+  const altura = Number(user.altura_cm) || 175;
+  const pesoMeta = Number(user.peso_meta_kg) || 70;
+  const nivel = (user.nivel_actividad || "sedentario").toLowerCase();
 
   // Factor de actividad real Mifflin-St Jeor / Harris-Benedict:
   // sedentario: 1.2
@@ -272,7 +275,7 @@ export function getMockCalculateTargets(user?: Partial<UserAntropoData>): NutriE
 
 export function getMockMealPlanner(caloriasMeta?: number): NutriEngineOutput {
   const out = getEmptyNutriOutput("MEAL_PLANNER");
-  const targetKcal = caloriasMeta && caloriasMeta > 1000 ? caloriasMeta : 1817;
+  const targetKcal = caloriasMeta && caloriasMeta > 1000 ? caloriasMeta : 2000;
   const diasSemana: Array<"Lunes" | "Martes" | "Miercoles" | "Jueves" | "Viernes" | "Sabado" | "Domingo"> = [
     "Lunes",
     "Martes",

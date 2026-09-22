@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
       userData: inUser,
       mealPlanPreferences: inMealPrefs,
       existingMealPlan: inPlan,
+      userHint: inUserHint,
     } = body;
 
+    let userHint: string | undefined = inUserHint;
     inputText = inText;
     imageBase64 = inImg;
     imageMimeType = inImgMime;
@@ -136,6 +138,10 @@ Acción solicitada o detectada: "${targetAction}"
 
     if (inputText) {
       instructionText += `Texto o consulta del usuario: "${inputText}"\n`;
+    }
+
+    if (userHint) {
+      instructionText += `Pista o nota explícita del usuario sobre el alimento o plato: "${userHint}" (prioriza esta pista para identificar el plato con máxima exactitud)\n`;
     }
 
     if (userData) {

@@ -17,6 +17,7 @@ import {
   UserAntropoData,
   PlanComidas,
   ItemDiario,
+  EscaneoComida,
 } from "@/types/nutrition";
 import { AuthModal } from "@/components/AuthModal";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -85,7 +86,7 @@ export default function HomePage() {
     () => new Date().toISOString().split("T")[0]
   );
 
-  const STORAGE_KEY = "nutriengine_pwa_v5_clean";
+  const STORAGE_KEY = "nutriengine_pwa_v6_clean";
   const [isHydrated, setIsHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<{
     id: string;
@@ -132,7 +133,8 @@ export default function HomePage() {
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        // Purgar datos de prueba previos
+        // Purgar datos de prueba previos y versiones anteriores
+        localStorage.removeItem("nutriengine_pwa_v5_clean");
         localStorage.removeItem("nutriengine_pwa_v4_advanced");
         localStorage.removeItem("nutriengine_state_v3");
         localStorage.removeItem("nutriengine_state_v2");
@@ -142,6 +144,13 @@ export default function HomePage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === "object") {
+            // Si el estado almacenado tiene 1817 kcal pero no tiene perfil de usuario real, purgar metas a 0
+            if (
+              parsed.metas_y_progreso?.calorias_diarias_recomendadas === 1817 &&
+              !parsed.perfil_usuario?.edad
+            ) {
+              parsed.metas_y_progreso = createCleanInitialState().metas_y_progreso;
+            }
             setEngineState((prev) => ({
               ...prev,
               ...parsed,
@@ -172,12 +181,14 @@ export default function HomePage() {
     try {
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("nutriengine_pwa_v5_clean");
         localStorage.removeItem("nutriengine_pwa_v4_advanced");
       }
     } catch (e) {
       console.warn(e);
     }
     setEngineState(createCleanInitialState());
+    setCapturedImage(null);
     setErrorMessage("Aplicación restablecida a estado limpio.");
   };
 
@@ -268,21 +279,34 @@ export default function HomePage() {
   };
 
   // Handlers for the 6 actions
-  const handleScanImage = async (base64: string, mimeType: string) => {
+  const handleScanImage = async (base64: string, mimeType: string, userHint?: string) => {
     setActiveTab("SCAN_FOOD");
+    // Limpiar inmediatamente el plato previo para evitar mostrar datos antiguos durante el análisis
+    setEngineState((prev) => ({
+      ...prev,
+      escaneo_comida: getEmptyNutriOutput("SCAN_FOOD").escaneo_comida,
+    }));
     await callNutritionEngine(
       {
         imageBase64: base64,
         imageMimeType: mimeType,
+        userHint,
       },
       "SCAN_FOOD"
     );
   };
 
-  const handleCameraCapture = (base64: string) => {
+  const handleCameraCapture = (base64: string, userHint?: string) => {
     setCapturedImage(base64);
     setActiveTab("SCAN_FOOD");
-    handleScanImage(base64, "image/jpeg");
+    handleScanImage(base64, "image/jpeg", userHint);
+  };
+
+  const handleUpdateEscaneoData = (updated: EscaneoComida) => {
+    setEngineState((prev) => ({
+      ...prev,
+      escaneo_comida: updated,
+    }));
   };
 
   const handleLogTextOrVoice = async (params: {
@@ -405,6 +429,7 @@ export default function HomePage() {
       setEngineState((prev) => ({
         ...prev,
         accion_ejecutada: "CALCULATE_TARGETS_AND_TIMELINE",
+        perfil_usuario: userData,
         metas_y_progreso: immediateData.metas_y_progreso,
         registro_agua: {
           meta_ml: targetWaterMl,
@@ -505,6 +530,7 @@ export default function HomePage() {
               isProcessing={isProcessing}
               onOpenLiveCamera={() => setIsCameraOpen(true)}
               externalCapturedImage={capturedImage}
+              onUpdateEscaneoData={handleUpdateEscaneoData}
             />
           )}
 
@@ -526,7 +552,9 @@ export default function HomePage() {
           {activeTab === "CALCULATE_TARGETS_AND_TIMELINE" && (
             <CalculateTargetsTab
               metasData={engineState.metas_y_progreso}
+              perfilUsuario={engineState.perfil_usuario}
               onCalculateTargets={handleCalculateTargets}
+              onResetTargets={handleResetState}
               isProcessing={isProcessing}
             />
           )}

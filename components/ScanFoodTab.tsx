@@ -26,10 +26,11 @@ import { DualAngleCaptureModal } from "./DualAngleCaptureModal";
 
 interface ScanFoodTabProps {
   escaneoData: EscaneoComida;
-  onScanImage: (base64: string, mimeType: string) => Promise<void>;
+  onScanImage: (base64: string, mimeType: string, userHint?: string) => Promise<void>;
   isProcessing: boolean;
   onOpenLiveCamera?: () => void;
   externalCapturedImage?: string | null;
+  onUpdateEscaneoData?: (updated: EscaneoComida) => void;
 }
 
 export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
@@ -38,8 +39,13 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
   isProcessing,
   onOpenLiveCamera,
   externalCapturedImage,
+  onUpdateEscaneoData,
 }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [userHint, setUserHint] = useState<string>("");
+  const [customDishTitle, setCustomDishTitle] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitleInput, setTempTitleInput] = useState("");
   const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [showDualAngleModal, setShowDualAngleModal] = useState(false);
@@ -62,13 +68,14 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       setPreviewImage(base64);
-      onScanImage(base64, file.type || "image/jpeg");
+      setCustomDishTitle(null);
+      onScanImage(base64, file.type || "image/jpeg", userHint.trim() || undefined);
     };
     reader.readAsDataURL(file);
   };
 
   const {
-    nombre_plato,
+    nombre_plato: rawDishName,
     peso_total_preparado_g,
     peso_g,
     calorias_totales = 0,
@@ -79,6 +86,7 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
       "¿El plato incluye alguna salsa o aderezo no visible?",
       "¿El peso total de la porción se ajusta a lo que ves?",
     ],
+    alternativas_posibles = [],
     control_calidad,
     macronutrientes = {
       proteinas_g: 0,
@@ -92,12 +100,15 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
     consejo_coach,
   } = escaneoData || {};
 
+  const nombre_plato = customDishTitle || rawDishName;
+
   const isUnrecognized =
     nombre_plato === "Alimento no detectado" ||
     nombre_plato === "No se pudo identificar el alimento" ||
     puntuacion_confianza === 0;
 
-  const hasScannedDish = Boolean(displayImage || (nombre_plato && !isUnrecognized));
+  // IMPORTANT: When isProcessing is true, NEVER render stale dish results!
+  const hasScannedDish = Boolean(!isProcessing && (displayImage || (nombre_plato && !isUnrecognized)));
 
   const baseWeight = (peso_total_preparado_g ?? peso_g) || 0;
 
@@ -119,6 +130,78 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
       ...prev,
       [index]: val,
     }));
+  };
+
+  const handleSelectAlternative = (alt: string) => {
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(25);
+    }
+    setCustomDishTitle(alt);
+
+    if (onUpdateEscaneoData) {
+      const isBeef =
+        alt.toLowerCase().includes("res") ||
+        alt.toLowerCase().includes("mechar") ||
+        alt.toLowerCase().includes("mechada") ||
+        alt.toLowerCase().includes("ternera");
+      const isPork = alt.toLowerCase().includes("cerdo") || alt.toLowerCase().includes("carnitas");
+      const isChicken = alt.toLowerCase().includes("pollo");
+
+      const weight = currentTotalWeight || 228;
+      let newCal = calorias_totales;
+      let newProt = macronutrientes.proteinas_g;
+      let newFat = macronutrientes.grasas_g;
+      let newCarb = macronutrientes.carbohidratos_g;
+
+      if (isBeef) {
+        newCal = Math.round((weight / 100) * 215);
+        newProt = Math.round((weight / 100) * 30);
+        newFat = Math.round((weight / 100) * 10);
+        newCarb = Math.round((weight / 100) * 1.5);
+      } else if (isChicken) {
+        newCal = Math.round((weight / 100) * 165);
+        newProt = Math.round((weight / 100) * 31);
+        newFat = Math.round((weight / 100) * 4);
+        newCarb = Math.round((weight / 100) * 1);
+      } else if (isPork) {
+        newCal = Math.round((weight / 100) * 240);
+        newProt = Math.round((weight / 100) * 26);
+        newFat = Math.round((weight / 100) * 14);
+        newCarb = Math.round((weight / 100) * 1);
+      }
+
+      const totalKcal = Math.max(1, newCal);
+      const protPct = Math.round(((newProt * 4) / totalKcal) * 100);
+      const fatPct = Math.round(((newFat * 9) / totalKcal) * 100);
+      const carbPct = Math.max(0, 100 - protPct - fatPct);
+
+      onUpdateEscaneoData({
+        ...escaneoData,
+        nombre_plato: alt,
+        peso_total_preparado_g: weight,
+        peso_g: weight,
+        calorias_totales: newCal,
+        macronutrientes: {
+          proteinas_g: newProt,
+          grasas_g: newFat,
+          carbohidratos_g: newCarb,
+          porcentaje_proteinas: protPct,
+          porcentaje_grasas: fatPct,
+          porcentaje_carbohidratos: carbPct,
+        },
+        ingredientes: [
+          {
+            alimento: alt,
+            peso_estimado_g: weight,
+            peso_g: weight,
+            calorias: newCal,
+            proteinas_g: newProt,
+            grasas_g: newFat,
+            carbohidratos_g: newCarb,
+          },
+        ],
+      });
+    }
   };
 
   return (
@@ -154,21 +237,35 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
                 Guía de foto ℹ️
               </button>
 
-              {/* Bottom Dish Title overlay */}
-              <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
-                <div>
-                  <h4 className="text-white font-black text-sm tracking-tight drop-shadow-md">
-                    {nombre_plato || "Plato identificado"}
-                  </h4>
-                  <p className="text-stone-300 text-xs drop-shadow-sm font-medium">
-                    {currentCalories} kcal • {currentTotalWeight} g preparado
-                  </p>
+              {/* Bottom Dish Title overlay or Analyzing indicator */}
+              {isProcessing ? (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-10">
+                  <div className="relative w-14 h-14 mb-2.5 flex items-center justify-center">
+                    <span className="absolute inset-0 rounded-full border-2 border-fitia-yellow border-t-transparent animate-spin" />
+                    <Sparkles className="w-6 h-6 text-fitia-yellow animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-black text-white tracking-tight">Analizando alimento con IA...</p>
+                    <p className="text-xs text-stone-300 font-medium">Estimando volumen tridimensional y macronutrientes...</p>
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-fitia-yellow to-transparent animate-pulse" />
                 </div>
+              ) : (
+                <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                  <div>
+                    <h4 className="text-white font-black text-sm tracking-tight drop-shadow-md">
+                      {nombre_plato || "Plato identificado"}
+                    </h4>
+                    <p className="text-stone-300 text-xs drop-shadow-sm font-medium">
+                      {currentCalories} kcal • {currentTotalWeight} g preparado
+                    </p>
+                  </div>
 
-                <span className="px-2.5 py-1 rounded-full bg-fitia-yellow text-fitia-dark text-[10px] font-black uppercase">
-                  {metodo_coccion_inferido}
-                </span>
-              </div>
+                  <span className="px-2.5 py-1 rounded-full bg-fitia-yellow text-fitia-dark text-[10px] font-black uppercase">
+                    {metodo_coccion_inferido}
+                  </span>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center p-6 space-y-3 text-stone-300">
@@ -182,6 +279,27 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
                 </p>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Campo opcional de pista rápida para máxima precisión */}
+        <div className="relative">
+          <input
+            type="text"
+            value={userHint}
+            onChange={(e) => setUserHint(e.target.value)}
+            placeholder="💡 Pista opcional: ej. carne de mechar, sin azúcar..."
+            disabled={isProcessing}
+            className="w-full h-10 px-3.5 text-xs font-semibold rounded-2xl border border-stone-200 bg-white placeholder:text-stone-400 text-stone-900 focus:outline-none focus:border-fitia-yellow transition shadow-2xs"
+          />
+          {userHint && (
+            <button
+              type="button"
+              onClick={() => setUserHint("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-[10px] hover:bg-stone-200"
+            >
+              ✕
+            </button>
           )}
         </div>
 
@@ -253,22 +371,136 @@ export const ScanFoodTab: React.FC<ScanFoodTabProps> = ({
         </div>
       )}
 
+      {isProcessing && (
+        <div className="bg-white rounded-4xl border border-stone-200 p-6 shadow-sm text-center space-y-3.5">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-fitia-yellow/20 flex items-center justify-center text-fitia-dark">
+            <Sparkles className="w-6 h-6 animate-spin text-fitia-dark" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-black text-fitia-dark">Analizando imagen con IA...</h4>
+            <p className="text-xs text-stone-500 max-w-xs mx-auto">
+              Estimando densidad, método de preparación y macronutrientes precisos
+            </p>
+          </div>
+          <div className="h-1.5 w-40 mx-auto bg-stone-100 rounded-full overflow-hidden">
+            <div className="h-full bg-fitia-yellow rounded-full animate-pulse" style={{ width: "70%" }} />
+          </div>
+        </div>
+      )}
+
       {hasScannedDish ? (
         <>
           {/* PANTALLA DE RESULTADOS TRAS ESCANEAR */}
           <div className="bg-white rounded-4xl border border-neutral-100 p-5 shadow-sm space-y-4">
-        {/* Encabezado con Nombre y Porción Preparada */}
+        {/* Encabezado con Nombre Editable y Porción Preparada */}
         <div>
-          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
-            Resultado Escáner IA
-          </span>
-          <h3 className="text-lg font-black text-fitia-dark leading-tight mt-0.5">
-            {nombre_plato || "Plato listo"}
-          </h3>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+              Resultado Escáner IA
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setTempTitleInput(nombre_plato || "");
+                setIsEditingTitle(!isEditingTitle);
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-stone-500 hover:text-fitia-dark px-2 py-0.5 rounded-lg hover:bg-stone-100 transition active:scale-95"
+              title="Editar nombre del plato"
+            >
+              <Pencil className="w-3 h-3 text-stone-600" />
+              <span>{isEditingTitle ? "Cancelar" : "Editar"}</span>
+            </button>
+          </div>
+
+          {isEditingTitle ? (
+            <div className="flex items-center gap-2 mt-1.5">
+              <input
+                type="text"
+                value={tempTitleInput}
+                onChange={(e) => setTempTitleInput(e.target.value)}
+                placeholder="Ej. Carne de mechar de res"
+                className="flex-1 h-9 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-900 bg-stone-50"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (tempTitleInput.trim()) {
+                    setCustomDishTitle(tempTitleInput.trim());
+                  }
+                  setIsEditingTitle(false);
+                }}
+                className="h-9 px-3 rounded-xl bg-fitia-yellow text-fitia-dark font-black text-xs hover:bg-[#F5BF00] transition active:scale-95"
+              >
+                Guardar
+              </button>
+            </div>
+          ) : (
+            <h3 className="text-lg font-black text-fitia-dark leading-tight mt-0.5">
+              {nombre_plato || "Plato listo"}
+            </h3>
+          )}
           <p className="text-xs font-medium text-neutral-500 mt-1">
             Datos por 1 porción ({currentTotalWeight} g) preparado
           </p>
         </div>
+
+        {/* Selector interactivo de tipo de carne / alternativas rápidas */}
+        {(() => {
+          const lowerName = (nombre_plato || "").toLowerCase();
+          const isShreddedOrMeat =
+            lowerName.includes("deshebrad") ||
+            lowerName.includes("mechada") ||
+            lowerName.includes("mechar") ||
+            lowerName.includes("pollo") ||
+            lowerName.includes("res") ||
+            lowerName.includes("cerdo") ||
+            alternativas_posibles.length > 0;
+
+          if (!isShreddedOrMeat) return null;
+
+          const defaultAlternatives = [
+            "Carne de mechar (Res/Ternera)",
+            "Pollo deshebrado",
+            "Cerdo deshebrado / Carnitas",
+          ];
+          const list = alternativas_posibles.length > 0 ? alternativas_posibles : defaultAlternatives;
+
+          return (
+            <div className="p-3 rounded-2xl bg-amber-50/50 border border-amber-200/70 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-stone-700">
+                <span>¿Es otro tipo de carne o preparación?</span>
+                <span className="text-[10px] text-fitia-dark font-bold">1 toque para cambiar</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {list.map((alt, i) => {
+                  const isSelected = lowerName.includes(alt.toLowerCase().slice(0, 8));
+                  const emoji = alt.toLowerCase().includes("pollo")
+                    ? "🍗"
+                    : alt.toLowerCase().includes("cerdo")
+                    ? "🐖"
+                    : "🥩";
+
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSelectAlternative(alt)}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                        isSelected
+                          ? "bg-fitia-yellow text-fitia-dark border border-fitia-dark/20 shadow-xs"
+                          : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-50"
+                      }`}
+                    >
+                      <span>{emoji}</span>
+                      <span>{alt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Calorías totales destacadas */}
         <div className="flex items-baseline justify-between py-2 px-3 rounded-2xl bg-neutral-50 border border-neutral-100">
